@@ -12,7 +12,8 @@ include_directories(./)
 
 add_executable(${PRJ_NAME} 
     main.cpp
-    src.cpp
+    model_multiply.cpp
+    model_conv_bias_sum_reshape.cpp
 )
 
 target_link_libraries(${PRJ_NAME} 

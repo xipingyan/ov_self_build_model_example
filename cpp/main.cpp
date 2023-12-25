@@ -1,0 +1,13 @@
+#include <iostream>
+#include "header.hpp"
+
+#define TEST(FUN) std::cout << "Start test: " << #FUN << std::endl; \
+    bool ret = FUN; \
+    std::cout << (ret ? "Done." : "Failure.") << std::endl
+
+int main(int argc, char **argv)
+{
+    // TEST(test_model_multiply());
+    TEST(test_model_conv_bias_sum_reshape());
+    return EXIT_SUCCESS;
+}

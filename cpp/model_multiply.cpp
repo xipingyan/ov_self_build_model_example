@@ -40,7 +40,7 @@ std::shared_ptr<ov::Model> initModel(ov::element::Type rtPrc, ov::Shape inpShape
     return model;
 }
 
-void test_construct_model()
+bool test_model_multiply()
 {
     bool bSync = true;
     ov::Shape inpShape = ov::Shape{1, 5, 12, 64};
@@ -112,5 +112,6 @@ void test_construct_model()
         if (vecConst[i])
             delete[] vecConst[i];
     }
-    std::cout << "Test model pass." << std::endl;
+    std::cout << "  Test model pass." << std::endl;
+    return true;
 }
