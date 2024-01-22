@@ -19,10 +19,10 @@ def model():
 core = Core()
  
 m = model()
-cm = core.compile_model(model=m, device_name="CPU")
+compiled_model = core.compile_model(model=m, device_name="CPU")
 
 input=np.array([[1]]).astype(np.float32)
-result = cm(input)[cm.output(0)]
+result = compiled_model(input)[compiled_model.output(0)]
 
 print("indices=", input)
 print("---------------------->")
