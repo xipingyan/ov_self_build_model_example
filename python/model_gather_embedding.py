@@ -66,8 +66,8 @@ def model_u8():
 
     # Scale f16
     if test_big_shape:
-        # scale = op.Constant(np.random.randint(2, size=(weight_size, 1)).astype(np.float16))
-        scale = op.Constant(np.full((weight_size, 1), 64).astype(np.float16))
+        # scale = op.Constant(np.random.randint(64, size=(weight_size, 1)).astype(np.float16))
+        scale = op.Constant(np.full((weight_size, 1), 2).astype(np.float16))
     else:
         scale = op.Constant(np.array([[2], [2], [2], [2]]).astype(np.float16))
 
@@ -90,14 +90,20 @@ def test_gather_embedding():
     compiled_model = core.compile_model(model=m, device_name="CPU")
 
     # Support negtive input
-    # input=np.array([[1], [-4]]).astype(np.float32)
+    # input=np.array([[1]]).astype(np.float32)
+    # result = compiled_model(input)[compiled_model.output(0)]
+    # print("indices=", input)
+    # print("---------------------->")
+    # print("Real     result=", result, "shape=", result.shape, "dtype=", result.dtype)
+    # print("Expected result= [[[40. 42.]]]")
+
+    # Test big data.
     input=np.array([[0], [1], [2]]).astype(np.float32)
     result = compiled_model(input)[compiled_model.output(0)]
-
     print("indices=", input)
     print("---------------------->")
-    print("Real     result=", result, "shape=", result.shape, "dtype=", result.dtype)
-    print("Expected result= [[[40. 42.]]]")
+    print("Real result=\n", result, "shape=", result.shape, "dtype=", result.dtype)
+    print("Expected result=\n [[[0. ...], [2. ...], [4. ...]]]")
 
 # test_gather()
 test_gather_embedding()
