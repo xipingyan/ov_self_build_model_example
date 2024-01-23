@@ -33,7 +33,7 @@ def model_u8():
     input_ids = opset.parameter([-1, -1], Type.i64, name = 'indices')
     cvt_ids = opset.convert(input_ids, np.int32)
 
-    test_big_shape = 0
+    test_big_shape = 1
     if test_big_shape:
         weight_size = 151936
         weight_dim = 4096
@@ -43,8 +43,11 @@ def model_u8():
 
     # Weight u8
     if test_big_shape:
-        weights = op.Constant(np.random.randint(
-            255, size=(weight_size, weight_dim)).astype(np.uint8))
+        weight_np = np.random.randint(255, size=(weight_size, weight_dim)).astype(np.uint8)
+        weight_np[0] = 1
+        weight_np[1] = 2
+        weight_np[2] = 3
+        weights = op.Constant(weight_np)
     else:
         weights = op.Constant(
             np.array([[1, 2], [21, 22], [31, 32], [41, 42]]).astype(np.uint8))
@@ -53,8 +56,8 @@ def model_u8():
 
     # ZP u8
     if test_big_shape:
-        zeropoint = op.Constant(np.random.randint(
-            255, size=(weight_size, 1)).astype(np.uint8))
+        # zeropoint = op.Constant(np.random.randint(255, size=(weight_size, 1)).astype(np.uint8))
+        zeropoint = op.Constant(np.full((weight_size, 1), 1).astype(np.uint8))
     else:
         zeropoint = op.Constant(
             np.array([[1], [1], [1], [1]]).astype(np.uint8))
@@ -63,8 +66,8 @@ def model_u8():
 
     # Scale f16
     if test_big_shape:
-        scale = op.Constant(np.random.randint(
-            2, size=(weight_size, 1)).astype(np.float16))
+        # scale = op.Constant(np.random.randint(2, size=(weight_size, 1)).astype(np.float16))
+        scale = op.Constant(np.full((weight_size, 1), 64).astype(np.float16))
     else:
         scale = op.Constant(np.array([[2], [2], [2], [2]]).astype(np.float16))
 
@@ -86,7 +89,9 @@ def test_gather_embedding():
     m = model_u8()
     compiled_model = core.compile_model(model=m, device_name="CPU")
 
-    input=np.array([[1], [1]]).astype(np.float32)
+    # Support negtive input
+    # input=np.array([[1], [-4]]).astype(np.float32)
+    input=np.array([[0], [1], [2]]).astype(np.float32)
     result = compiled_model(input)[compiled_model.output(0)]
 
     print("indices=", input)
