@@ -1,8 +1,11 @@
 from openvino.runtime import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
+import openvino.runtime as ov
+import openvino.properties.hint as hints
 from openvino.runtime.op import util as op_util
 from openvino.runtime import opset8 as opset
 from openvino.runtime.passes import Manager
 import numpy as np
+import time
 
 def model():
     data = op.Constant(np.array([[1,2], [21,22], [31,32], [41,42]]).astype(np.int32))
@@ -29,48 +32,25 @@ def test_gather():
     print("result shape=", result.shape)
     print("result=", result)
 
-def model_u8():
+def model_u8(weight_np:np.array):
     input_ids = opset.parameter([-1, -1], Type.i64, name = 'indices')
     cvt_ids = opset.convert(input_ids, np.int32)
 
-    test_big_shape = 1
-    if test_big_shape:
-        weight_size = 151936
-        weight_dim = 4096
-    else:
-        weight_size = 4
-        weight_dim = 2
-
     # Weight u8
-    if test_big_shape:
-        weight_np = np.random.randint(255, size=(weight_size, weight_dim)).astype(np.uint8)
-        weight_np[0] = 1
-        weight_np[1] = 2
-        weight_np[2] = 3
-        weights = op.Constant(weight_np)
-    else:
-        weights = op.Constant(
-            np.array([[1, 2], [21, 22], [31, 32], [41, 42]]).astype(np.uint8))
-
+    weight_size = weight_np.shape[0]
+    weights = op.Constant(weight_np)
     cvt_weights_to_fp16 = opset.convert(weights, np.float16)
 
     # ZP u8
-    if test_big_shape:
-        # zeropoint = op.Constant(np.random.randint(255, size=(weight_size, 1)).astype(np.uint8))
-        zeropoint = op.Constant(np.full((weight_size, 1), 1).astype(np.uint8))
-    else:
-        zeropoint = op.Constant(
-            np.array([[1], [1], [1], [1]]).astype(np.uint8))
+    # zeropoint = op.Constant(np.random.randint(255, size=(weight_size, 1)).astype(np.uint8))
+    zeropoint = op.Constant(np.full((weight_size, 1), 1).astype(np.uint8))
 
     cvt_zp_to_fp16 = opset.convert(zeropoint, np.float16)
 
     # Scale f16
-    if test_big_shape:
-        # scale = op.Constant(np.random.randint(64, size=(weight_size, 1)).astype(np.float16))
-        scale = op.Constant(np.full((weight_size, 1), 2).astype(np.float16))
-    else:
-        scale = op.Constant(np.array([[2], [2], [2], [2]]).astype(np.float16))
-
+    # scale = op.Constant(np.random.randint(64, size=(weight_size, 1)).astype(np.float16))
+    scale = op.Constant(np.full((weight_size, 1), 2).astype(np.float16))
+ 
     subtract = opset.subtract(cvt_weights_to_fp16, cvt_zp_to_fp16)
     multiply = opset.multiply(subtract, scale)
 
@@ -78,32 +58,65 @@ def model_u8():
 
     axis = op.Constant(Type.i32, Shape([1]), [0])
 
-    op_gather = opset.gather(cvt_mul, cvt_ids, axis)
+    gather = opset.gather(cvt_mul, cvt_ids, axis)
 
-    Result = opset.result(op_gather, name='output_gather')
-    return Model([Result], [input_ids], 'model_gather')
+    matmul = opset.matmul(gather, op.Constant(np.full((4096, 1), 1).astype(np.float32)), False, False)
+
+    Result = opset.result(matmul, name='output')
+    return Model([Result], [input_ids], 'output')
+
+def get_expected(input, weight_np, zp=1, scale=2, have_matmul=1):
+    last_dim = 1 if have_matmul else weight_np.shape[1]
+    expected=np.zeros((input.shape[0], input.shape[1], last_dim))
+    for b in range(input.shape[0]):
+        for s in range(input.shape[1]):
+            idx = input[b][s].astype(np.int32)
+            if idx < 0:
+                idx = idx + weight_np.shape[0]
+            tmp = (weight_np[idx].astype(np.float32) - zp)*scale
+            if have_matmul:
+                expected[b][s] = sum(tmp)
+            else:
+                expected[b][s] = tmp
+    return expected
+def print_np(prefix, arr):
+    print(prefix, "\n", arr, "shape=", arr.shape, "dtype=", arr.dtype)
+
+def test_one_time(prec, input_shape, weight_np):
+    core = Core()
+
+    m = model_u8(weight_np)
+    core.set_property("CPU", {hints.inference_precision: prec})
+
+    print("--->inference_precision=", prec, "input_shape=", input_shape)
+    t1 = time.time()
+    compiled_model = core.compile_model(model=m, device_name="CPU")
+    t2 = time.time()
+    print("  Compile model:", t2 - t1)
+
+    for i in range(10):
+        input=np.random.randint(151935, size=input_shape).astype(np.int64)
+        result = compiled_model(input)[compiled_model.output(0)]
+    return input, result
 
 def test_gather_embedding():
     print("--->Test: test_gather_embedding")
-    core = Core()
-    m = model_u8()
-    compiled_model = core.compile_model(model=m, device_name="CPU")
+    print("OV version:", ov.get_version())
+    
+    weight_np = np.random.randint(255, size=(151936, 4096)).astype(np.uint8)
+    # weight_np = np.array([[1,2], [21,22], [31,32], [41,42]]).astype(np.uint8)
 
-    # Support negtive input
-    # input=np.array([[1]]).astype(np.float32)
-    # result = compiled_model(input)[compiled_model.output(0)]
-    # print("indices=", input)
-    # print("---------------------->")
-    # print("Real     result=", result, "shape=", result.shape, "dtype=", result.dtype)
-    # print("Expected result= [[[40. 42.]]]")
+    for prec in {Type.f32, Type.bf16}:
+        test_one_time(prec, input_shape=(1, 1), weight_np=weight_np)
+        test_one_time(prec, input_shape=(1, 32), weight_np=weight_np)
+        input, result = test_one_time(prec, input_shape=(1, 1024), weight_np=weight_np)
 
-    # Test big data.
-    input=np.array([[0], [1], [2]]).astype(np.float32)
-    result = compiled_model(input)[compiled_model.output(0)]
-    print("indices=", input)
-    print("---------------------->")
-    print("Real result=\n", result, "shape=", result.shape, "dtype=", result.dtype)
-    print("Expected result=\n [[[0. ...], [2. ...], [4. ...]]]")
+        # Test accuracy:
+        print("------------>Test accuracy, inference_precision=", prec)
+        expect = get_expected(input, weight_np)
+        if not np.allclose(expect, result):
+                print_np("Real result:", result)
+                print_np("Expected result:", get_expected(input, weight_np))
 
 # test_gather()
 test_gather_embedding()
