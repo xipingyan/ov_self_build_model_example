@@ -6,6 +6,7 @@ from openvino.runtime import opset8 as opset
 from openvino.runtime.passes import Manager
 import numpy as np
 import time
+import os
 
 def model():
     data = op.Constant(np.array([[1,2], [21,22], [31,32], [41,42]]).astype(np.int32))
@@ -34,6 +35,7 @@ def test_gather():
 
 def model_u8(weight_np:np.array):
     input_ids = opset.parameter([-1, -1], Type.i64, name = 'indices')
+    # input_ids = opset.parameter([1, 1], Type.i64, name = 'indices')
     cvt_ids = opset.convert(input_ids, np.int32)
 
     # Weight u8
@@ -94,7 +96,7 @@ def test_one_time(prec, input_shape, weight_np):
     t2 = time.time()
     print("  Compile model:", t2 - t1)
 
-    for i in range(10):
+    for i in range(1):
         input=np.random.randint(151935, size=input_shape).astype(np.int64)
         result = compiled_model(input)[compiled_model.output(0)]
     return input, result
@@ -106,17 +108,21 @@ def test_gather_embedding():
     weight_np = np.random.randint(255, size=(151936, 4096)).astype(np.uint8)
     # weight_np = np.array([[1,2], [21,22], [31,32], [41,42]]).astype(np.uint8)
 
-    for prec in {Type.f32, Type.bf16}:
-        test_one_time(prec, input_shape=(1, 1), weight_np=weight_np)
-        test_one_time(prec, input_shape=(1, 32), weight_np=weight_np)
-        input, result = test_one_time(prec, input_shape=(1, 1024), weight_np=weight_np)
+    if os.getenv('RUN1'):
+        print("------Run one time--------")
+        test_one_time(Type.f32, input_shape=(1, 1), weight_np=weight_np)
+    else:
+        for prec in {Type.f32, Type.bf16}:
+            test_one_time(prec, input_shape=(1, 1), weight_np=weight_np)
+            test_one_time(prec, input_shape=(1, 32), weight_np=weight_np)
+            input, result = test_one_time(prec, input_shape=(1, 1024), weight_np=weight_np)
 
-        # Test accuracy:
-        print("------------>Test accuracy, inference_precision=", prec)
-        expect = get_expected(input, weight_np)
-        if not np.allclose(expect, result):
-                print_np("Real result:", result)
-                print_np("Expected result:", get_expected(input, weight_np))
+            # Test accuracy:
+            print("------------>Test accuracy, inference_precision=", prec)
+            expect = get_expected(input, weight_np)
+            if not np.allclose(expect, result):
+                    print_np("Real result:", result)
+                    print_np("Expected result:", get_expected(input, weight_np))
 
 # test_gather()
 test_gather_embedding()
