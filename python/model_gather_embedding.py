@@ -16,13 +16,30 @@ def model():
     print("axis=", axis)
    
     op_gather = opset.gather(data, indices, axis)
+    op_gather.set_friendly_name("my_gather")
  
     Result = opset.result(op_gather, name='output_gather')
     return Model([Result], [indices], 'model_gather')
+
+# Add one layer example
+import openvino.runtime.opset11 as ops
+def update_model(model):
+    for op in model.get_ordered_ops():
+        if op.get_friendly_name() == "my_gather":
+            print("Add result to ", op.get_friendly_name())
+            result2 = ops.result(op, "res2")
+            result2.set_friendly_name("my_add_res2")
+            model.add_results([result2])
+            break
+    
 def test_gather():
     core = Core()
     
     m = model()
+
+    # Add one layer after gather
+    update_model(m)
+
     compiled_model = core.compile_model(model=m, device_name="CPU")
 
     input=np.array([[1, 2]]).astype(np.float32)
@@ -124,5 +141,5 @@ def test_gather_embedding():
                     print_np("Real result:", result)
                     print_np("Expected result:", get_expected(input, weight_np))
 
-# test_gather()
-test_gather_embedding()
+test_gather()
+# test_gather_embedding()
