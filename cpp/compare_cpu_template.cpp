@@ -51,19 +51,31 @@ ov::Tensor get_infer_result(std::string dev, ov::Tensor &input, ov::Core core, s
     return infer_req.get_output_tensor();
 }
 
-bool test_cpu_template_compare()
+// Initialize input with all prob values of u8
+ov::Tensor init_input()
 {
-    bool bSync = true;
+#if 0
 #define shape_sz 128
     ov::Shape inpShape = ov::Shape{shape_sz};
-    ov::element::Type rtPrc = ov::element::i4;
-
-    std::vector<float *> vecConst;
-    for (int i = 0; i < 3; i++)
+    uint8_t input_arr[shape_sz / 2] = {69, 65, 41, 101, 135, 97, 129, 97, 41, 41, 37,
+                                       129, 69, 97, 37, 33, 5, 37, 73, 101, 73, 67, 33, 69, 39, 103, 135, 37, 3, 69,
+                                       101, 35, 105, 65, 99, 129, 73, 3, 129, 137, 99, 33, 39, 37, 69, 131, 37, 133,
+                                       105, 133, 101, 41, 97, 9, 39, 133, 5, 39, 9, 105, 5, 135, 103, 3};
+    ov::Tensor input = ov::Tensor(ov::element::i4, inpShape, input_arr);
+#else
+    ov::Tensor input = ov::Tensor(ov::element::i4, ov::Shape{256*2});
+    uint8_t *pdata =reinterpret_cast<uint8_t*>(input.data());
+    for (size_t i = 0; i < 256; i++)
     {
-        vecConst.emplace_back(new float[shape_size(inpShape)]);
+        pdata[i] = static_cast<uint8_t>(i);
     }
+#endif
+    return input;
+}
 
+bool test_cpu_template_compare()
+{
+    ov::element::Type rtPrc = ov::element::i4;
     std::shared_ptr<ov::Model> model;
     ov::Tensor outTensor;
 
@@ -71,14 +83,10 @@ bool test_cpu_template_compare()
     ov::Core core = ov::Core();
 
     // Initial input Tensors
-    uint8_t input_arr[shape_sz / 2] = {69, 65, 41, 101, 135, 97, 129, 97, 41, 41, 37,
-                                       129, 69, 97, 37, 33, 5, 37, 73, 101, 73, 67, 33, 69, 39, 103, 135, 37, 3, 69,
-                                       101, 35, 105, 65, 99, 129, 73, 3, 129, 137, 99, 33, 39, 37, 69, 131, 37, 133,
-                                       105, 133, 101, 41, 97, 9, 39, 133, 5, 39, 9, 105, 5, 135, 103, 3};
-    ov::Tensor input = ov::Tensor(ov::element::i4, inpShape, input_arr);
+    auto input = init_input();
 
     // Construct model(subgraph)
-    model = initModel(rtPrc, inpShape);
+    model = initModel(rtPrc, input.get_shape());
 
     auto output_tensor_cpu = get_infer_result("CPU", input, core, model);
     // Enable template plugin: -DENABLE_TEMPLATE_REGISTRATION=ON
