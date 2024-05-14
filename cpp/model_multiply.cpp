@@ -31,7 +31,7 @@ void initBuf(float *pConst, size_t sz, float value)
 //     Multiply
 //        |
 //      Output
-std::shared_ptr<ov::Model> initModel(ov::element::Type rtPrc, ov::Shape inpShape)
+static std::shared_ptr<ov::Model> initModel(ov::element::Type rtPrc, ov::Shape inpShape)
 {
     auto params1 = std::make_shared<ov::opset1::Parameter>(rtPrc, inpShape);
     auto params2 = std::make_shared<ov::opset1::Parameter>(rtPrc, inpShape);

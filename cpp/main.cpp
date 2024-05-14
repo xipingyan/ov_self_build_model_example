@@ -8,6 +8,7 @@
 int main(int argc, char **argv)
 {
     // TEST(test_model_multiply());
-    TEST(test_model_conv_bias_sum_reshape());
+    // TEST(test_model_conv_bias_sum_reshape());
+    TEST(test_cpu_template_compare());
     return EXIT_SUCCESS;
 }
