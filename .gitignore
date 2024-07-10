@@ -1,3 +1,9 @@
 build
 .vscode
 python-env
+
+cpu_debug.log
+python/xxx_0.bin
+python/xxx_0.xml
+python/xxx_1.bin
+python/xxx_1.xml
