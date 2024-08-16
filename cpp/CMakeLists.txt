@@ -15,6 +15,7 @@ add_executable(${PRJ_NAME}
     model_multiply.cpp
     model_conv_bias_sum_reshape.cpp
     compare_cpu_template.cpp
+    model_stateful.cpp
 )
 
 target_link_libraries(${PRJ_NAME} 
