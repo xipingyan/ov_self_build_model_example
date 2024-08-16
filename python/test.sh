@@ -1,7 +1,7 @@
 
-source python-env/bin/activate
-# source ../../../openvino/build/install/setupvars.sh # Your OV Env.
-source /mnt/disk1/xiping/openvino/build/install/setupvars.sh
+source ../../python-env/bin/activate
+source ../../openvino/build/install/setupvars.sh # Your OV Env.
+# source /mnt/disk1/xiping/openvino/build/install/setupvars.sh
 # source /mnt/data_nvme1n1p1/xiping_workpath/golubev_ov/openvino/build/install/setupvars.sh
 
 echo "================================="
@@ -29,5 +29,5 @@ fi
 # numactl -C 96-137 python model_gather_embedding.py
 # numactl -C 0-47 $DEBUG_GDB python model_gather_embedding.py
 # numactl -C 0-47 $DEBUG_GDB python3 ./compare_result_and_expected.py
-
-numactl -C 0-47 $DEBUG_GDB python model_gather_embedding_versa.py
+# numactl -C 0-47 $DEBUG_GDB python model_gather_embedding_versa.py
+numactl -C 0-47 $DEBUG_GDB python model_stateful.py

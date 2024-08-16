@@ -39,7 +39,7 @@ static std::shared_ptr<ov::Model> initStatefulModel()
     return model;
 }
 
-bool test_model_stateful()
+bool test_model_stateful_device(std::string device)
 {
     bool bSync = true;
     // OpenVINO Core
@@ -54,13 +54,14 @@ bool test_model_stateful()
     auto model = initStatefulModel();
 
     // Compile model.
-    auto compiledModel = core.compile_model(model, "CPU");
+    auto compiledModel = core.compile_model(model, device);
     auto inferRequest = compiledModel.create_infer_request();
 
     inferRequest.set_input_tensors(0, {input1});
+    inferRequest.reset_state();
 
     // Inference
-    std::cout << "  == Start infer." << std::endl;
+    std::cout << "  == Start infer. device=" << device << std::endl;
     if (bSync)
     {
         inferRequest.infer();
@@ -86,5 +87,11 @@ bool test_model_stateful()
     std::cout << "]\n";
 
     std::cout << "Test model finish." << std::endl;
+    return true;
+}
+
+bool test_model_stateful() {
+    test_model_stateful_device("CPU");
+    test_model_stateful_device("TEMPLATE");
     return true;
 }
