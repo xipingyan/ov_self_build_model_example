@@ -7,3 +7,7 @@ python/xxx_0.bin
 python/xxx_0.xml
 python/xxx_1.bin
 python/xxx_1.xml
+
+python/.env
+python/env_new.txt
+python/env_old.txt
