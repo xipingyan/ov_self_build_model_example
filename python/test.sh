@@ -30,4 +30,7 @@ fi
 # numactl -C 0-47 $DEBUG_GDB python model_gather_embedding.py
 # numactl -C 0-47 $DEBUG_GDB python3 ./compare_result_and_expected.py
 # numactl -C 0-47 $DEBUG_GDB python model_gather_embedding_versa.py
-numactl -C 0-47 $DEBUG_GDB python model_stateful.py
+
+# numactl -C 0-47 $DEBUG_GDB python model_stateful.py
+
+OV_CPU_EXEC_GRAPH_PATH=xxx.xml numactl -C 0-47 $DEBUG_GDB python model_if.py
