@@ -8,15 +8,10 @@ find_package(OpenVINO REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # OneTBB
-include_directories(./)
+include_directories(./header/)
+file(GLOB SRC "header/*.h" "header/*.hpp" "src/*.cpp")
 
-add_executable(${PRJ_NAME} 
-    main.cpp
-    model_multiply.cpp
-    model_conv_bias_sum_reshape.cpp
-    compare_cpu_template.cpp
-    model_stateful.cpp
-)
+add_executable(${PRJ_NAME} ${SRC})
 
 target_link_libraries(${PRJ_NAME} 
     openvino::runtime

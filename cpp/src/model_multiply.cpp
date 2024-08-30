@@ -1,4 +1,4 @@
-#include "header.hpp"
+#include "private.hpp"
 
 #include <openvino/core/model.hpp>
 #include <openvino/openvino.hpp>

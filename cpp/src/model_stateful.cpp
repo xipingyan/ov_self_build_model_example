@@ -1,4 +1,4 @@
-#include "header.hpp"
+#include "private.hpp"
 
 #include <openvino/openvino.hpp>
 #include <openvino/opsets/opset1.hpp>
