@@ -11,15 +11,11 @@ import time
 import os
 
 # ======== Model graph ========
-# input1   intput2
-#   \         |
-#    \     convert  const1
-#     \        \     /
-#      \        matmul
-#       \         |
-#        \     ReadValue  input3
-#         \      /         /
-#         If  ReadValue
+#              input1
+#                 |
+# intput2        If     input3
+#    |          /   \      |
+#  then(multiply)  else(multiply)
 #               \   /
 #                Add
 #                 |
