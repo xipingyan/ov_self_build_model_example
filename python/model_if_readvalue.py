@@ -10,7 +10,7 @@ import os
 def rv_construct(inp_node, var_id):
     # Stateful
     var_info = op_util.VariableInfo()
-    var_info.data_shape = PartialShape([1])
+    var_info.data_shape = inp_node.get_input_partial_shape(0)
     var_info.data_type = Type.i32
     var_info.variable_id = var_id
     variable_1 = op_util.Variable(var_info)
@@ -40,6 +40,26 @@ def model_readvalue():
     m = opset.multiply(input1, rv)
     res = ov.opset6.result(m, "res")
     return Model(results=[res], sinks=[assign], parameters=[input1, input2], name='model_if_readvalue')
+
+# Include: 2 readvalue, 1 static, 1 dynamic
+def model_readvalue_2():
+    input1 = opset.parameter([1], Type.i32)
+
+    input2 = opset.parameter([1], Type.i32)
+    const1 = op.Constant(np.full((1), 2).astype(np.int32))
+    multiply1 = opset.multiply(input2, const1)
+    rv1, assign1 = rv_construct(multiply1, var_id="v1")
+
+    input3 = opset.parameter([-1], Type.i32)
+    const2 = op.Constant(np.full((1), 2).astype(np.int32))
+    multiply2 = opset.multiply(input3, const2)
+    rv2, assign2 = rv_construct(multiply2, var_id="v2")
+
+    m1 = opset.multiply(input1, rv1)
+    m2 = opset.multiply(input1, rv2)
+    add = opset.add(m1, m2)
+    res = ov.opset6.result(add, "res")
+    return Model(results=[res], sinks=[assign1, assign2], parameters=[input1, input2, input3], name='model_if_readvalue')
 
 def model_readvalue_optimize_with_if():
     input1 = opset.parameter([1], Type.i32)
@@ -88,17 +108,39 @@ def test_model_if_readvalue(device:str, optimize=False):
     infer_request = compiled_model.create_infer_request()
 
     scale = (0+1) * 2
-    for i in range(5):
+    for i in range(10):
         input1 = np.array([i+1]).astype(np.int32)
         input2 = np.array([i+1]).astype(np.int32)
         if i == 2:
             infer_request.reset_state()
             scale = (i+1) * 2
+        print(f"=====================================")
         print(f"== Infer:{i+1}, input1={input1}, input2={input2}, expected={(i+1)*scale}")
         result = infer_request.infer([input1, input2])[compiled_model.output(0)]
         print(f'== reuslt:{i+1} = {result}')
 
+def test_model_readvalue_2(device:str, optimize=False):
+    print(f'ov version:{ov.get_version()}, device={device}')
+    core = Core()
+    model = model_readvalue_2()
+    compiled_model = core.compile_model(model=model, device_name=device)
+    infer_request = compiled_model.create_infer_request()
+
+    scale = (0+1) * 2
+    for i in range(10):
+        input1 = np.array([i+1]).astype(np.int32)
+        input2 = np.array([i+1]).astype(np.int32)
+        input3 = np.array([i+1]).astype(np.int32)
+        if i == 2:
+            infer_request.reset_state()
+            scale = (i+1) * 2
+        print(f"=====================================")
+        print(f"== Infer:{i+1}, input1={input1}, input2={input2}, input3={input3}, expected={(i+1)*scale*2}")
+        result = infer_request.infer([input1, input2, input3])[compiled_model.output(0)]
+        print(f'== reuslt:{i+1} = {result}')
 # =====================================
 # test_model_if_readvalue('TEMPLATE')
 # test_model_if_readvalue('CPU', optimize=False)
-test_model_if_readvalue('CPU', optimize=True)
+# test_model_if_readvalue('CPU', optimize=True)
+
+test_model_readvalue_2('CPU')
