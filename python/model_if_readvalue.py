@@ -32,14 +32,16 @@ def model_readvalue():
     input1 = opset.parameter([1], Type.i32)
 
     input2 = opset.parameter([1], Type.i32)
+    multiply1 = opset.multiply(input2, input1)
     const1 = op.Constant(np.full((1), 2).astype(np.int32))
-    multiply = opset.multiply(input2, const1)
+    multiply = opset.multiply(multiply1, const1)
 
     rv, assign = rv_construct(multiply, var_id="v1")
 
-    m = opset.multiply(input1, rv)
-    res = ov.opset6.result(m, "res")
-    return Model(results=[res], sinks=[assign], parameters=[input1, input2], name='model_if_readvalue')
+    multiply2 = opset.multiply(input1, rv)
+    res1 = ov.opset6.result(multiply2, "res1")
+    res2 = ov.opset6.result(multiply1, "res2")
+    return Model(results=[res1, res2], sinks=[assign], parameters=[input1, input2], name='model_if_readvalue')
 
 # Include: 2 readvalue, 1 static, 1 dynamic
 def model_readvalue_2():
@@ -140,7 +142,7 @@ def test_model_readvalue_2(device:str, optimize=False):
         print(f'== reuslt:{i+1} = {result}')
 # =====================================
 # test_model_if_readvalue('TEMPLATE')
-# test_model_if_readvalue('CPU', optimize=False)
+test_model_if_readvalue('CPU', optimize=False)
 # test_model_if_readvalue('CPU', optimize=True)
 
-test_model_readvalue_2('CPU')
+# test_model_readvalue_2('CPU')
