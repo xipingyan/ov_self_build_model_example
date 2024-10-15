@@ -31,12 +31,13 @@ fi
 # numactl -C 0-47 $DEBUG_GDB python3 ./compare_result_and_expected.py
 # numactl -C 0-47 $DEBUG_GDB python model_gather_embedding_versa.py
 
-numactl -C 0-47 $DEBUG_GDB python model_stateful_readvalue_assign.py
 # numactl -C 0-47 $DEBUG_GDB python model_if.py
 # export OV_CPU_EXEC_GRAPH_PATH=xxx.xml 
 # export OV_CPU_DEBUG_LOG=-
 # export ENABLE_RVSUBGRAPH=1
-# numactl -C 0-47 $DEBUG_GDB python model_if_readvalue.py
+
+# numactl -C 0-47 $DEBUG_GDB python model_stateful_readvalue_assign.py
+numactl -C 0-47 $DEBUG_GDB python model_readvalue_init_subgraph.py
 
 # OV_CPU_EXEC_GRAPH_PATH=xxx.xml numactl -C 0-47 $DEBUG_GDB python model_gather.py
 
