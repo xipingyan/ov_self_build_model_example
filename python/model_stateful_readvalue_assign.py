@@ -14,11 +14,11 @@ import os
 # ======== Model graph ========
 #            const1
 #              |
-#            convert  
+#            convert1  
 #              |
 #   input1  ReadValue
-#      \      /
-#      Multiply
+#      \      /   \
+#      Multiply   Assign
 #         |
 #      Output
 def model_stateful_with_const_input():
@@ -36,9 +36,8 @@ def model_stateful_with_const_input():
     rv = ov.opset6.read_value(convert1, variable_1)
     assign = ov.opset6.assign(rv, variable_1)
 
+    # ??????????????????????????
     # Note: MatMul's result is wrong, but Multiply's result is right.
-    # m = opset.matmul(input1, convert1, False, False)
-    # m = opset.matmul(input1, rv, False, False)
     m = opset.multiply(input1, rv)
 
     res = ov.opset6.result(m, "res")
@@ -54,15 +53,23 @@ def test_model_stateful_const_input(device:str):
     # target_state = states[0]
     # print(f'states={states[0]}')
     # irq.reset_state()
-    
-    input1=np.array([[1,2,3,4]]).astype(np.float32)
 
     print(f"==Run stateful model: ReadValue have const input, device_name={device}")
-    for i in range(3):
+    for i in range(6):
+        input1=np.array([[1,2,3,4]]).astype(np.float32)
+        input1 = input1 * (i + 1)
+        expected = input1 * [[2],[2],[2],[2]]
+
         result = irq.infer(input1)[compiled_model_1.output(0)]
-        print(f'  loop {i}, reuslt={result}')
+        is_expected = np.array_equal(result, expected)
+        if is_expected:
+            print(f'  ** loop {i} ** input={input1}, result == expected')
+        else:
+            print(f'  ** loop {i} **\n  input={input1}\n  reuslt={result}\n  expected={expected}')
         # trigger stateful node to init again.
-        # irq.reset_state()
+        if i == 2:
+            print(f'  ----> reset_state ')
+            irq.reset_state()
 
 # ======== Model graph ========
 # input1   intput2
@@ -129,8 +136,7 @@ def test_model_stateful_var_input(device:str):
         input2 = np.array([[i+1], [i+1], [i+1], [i+1]]).astype(np.int32)
         input3 = np.array([i+1]).astype(np.float32)
         # print(f'input2 = {tmp}, i={i}')
-        result = infer_request.infer([input1, input2, input3])[
-            compiled_model_2.output(0)]
+        result = infer_request.infer([input1, input2, input3])[compiled_model_2.output(0)]
         print(f'  loop {i}, reuslt={result}')
 
         # Trigger ReadValue to init value again.
@@ -142,10 +148,90 @@ def test_model_stateful_var_input(device:str):
                 print(f"== state: {state.name}.reset()")
                 state.reset()
 
+# ======== Model graph =======================================================
+# Direct Graph                             Indirect Graph
+# 
+#            input2                                input2
+#              |                                     |
+#            convert1                             convert1   
+#              |                                     |
+#   input1  ReadValue      ------------>   input1 ReadValue
+#      \      /   \                           \     /
+#      Multiply   Assign                      Multiply
+#         |                                    /   \
+#      Output                              Output  Assign
+def model_direct_indirect_pair(direct_pair=True):
+    input1 = opset.parameter([2], Type.f32, name = 'input1')
+    input2 = opset.parameter([2], Type.i32, name = 'input2')
+    convert1 = opset.convert(input2, ov.Type.f32)
+
+    # Stateful
+    var_info = op_util.VariableInfo()
+    var_info.data_shape = PartialShape([2])
+    var_info.data_type = Type.f32
+    var_info.variable_id = "v1"
+    variable_1 = op_util.Variable(var_info)
+    rv = ov.opset6.read_value(convert1, variable_1)
+
+    multiply = opset.multiply(input1, rv)
+
+    if direct_pair:
+        assign = ov.opset6.assign(rv, variable_1)
+    else:
+        assign = ov.opset6.assign(multiply, variable_1)
+
+    res = ov.opset6.result(multiply, "res")
+
+    model_name = 'model_' + ("direct_pair" if direct_pair else "indirect_pair")
+    return Model(results=[res], sinks=[assign], parameters=[input1, input2], name=model_name)
+
+def test_model_direct_indirect_pair(device:str):
+    core = Core()
+    # 测试发现：无论是否reset，assign节点总是会写state。
+    direct_pair = True
+    direct_pair = False
+    model = model_direct_indirect_pair(direct_pair)
+    compiled_model = core.compile_model(model=model, device_name=device)
+    irq = compiled_model.create_infer_request()
+
+    print(f"==Run test_model_direct_indirect_pair, device_name={device}")
+    input1=np.array([1, 2]).astype(np.float32)
+    input2=np.array([2, 2]).astype(np.int32)
+    state_buf = input2
+    reset_id = 3
+    for i in range(7):
+        inp1 = input1 * (i + 1)
+        inp2 = input2 * (i + 1)
+
+        if i == reset_id:
+            print(f'  ----> reset_state ')
+            irq.reset_state()
+            state_buf = inp2
+        
+        expected = inp1 * state_buf
+
+        result = irq.infer([inp1,inp2])[compiled_model.output(0)]
+        if direct_pair == False:
+            state_buf = result
+
+        is_expected = np.array_equal(result, expected)
+        if is_expected:
+            print(f'** loop {i}: inp1={inp1}, inp2={inp2}, result == expected\n  reuslt={result}')
+        else:
+            print(f'** loop {i}: inp1={inp1}, inp2={inp2}\n  reuslt  ={result}\n  expected={expected}')
+
+# *****************************************************
+# Start test.
+# *****************************************************
+
 # == Test ReadValue's input is const
 # test_model_stateful_const_input('TEMPLATE')
 # test_model_stateful_const_input('CPU')
 
 # == Test ReadValue's input is parameter
 # test_model_stateful_var_input('TEMPLATE')
-test_model_stateful_var_input('CPU')
+# test_model_stateful_var_input('CPU')
+
+# == Test ReadValue Assign Direct and Indirect Pair.
+test_model_direct_indirect_pair('CPU')
+# test_model_direct_indirect_pair('TEMPLATE')

@@ -19,18 +19,19 @@ def rv_construct(inp_node, var_id):
     return rv, assign
 
 # ======== Model graph ========
-#         intput2  const
-#            \      /
-#            multiply
-#               |
-#  input1    ReadValue
-#       \    /
-#      multiply
-#          |
-#        Output
+#         input1  input2
+#        /   \      /
+#        |   multiply1
+#        |      |       \
+#        |   multiply   res2
+#        |      |
+#        |   ReadValue
+#        \     /
+#       multiply2
+#           |
+#          res1
 def model_readvalue():
     input1 = opset.parameter([1], Type.i32)
-
     input2 = opset.parameter([1], Type.i32)
     multiply1 = opset.multiply(input2, input1)
     const1 = op.Constant(np.full((1), 2).astype(np.int32))
@@ -41,12 +42,23 @@ def model_readvalue():
     multiply2 = opset.multiply(input1, rv)
     res1 = ov.opset6.result(multiply2, "res1")
     res2 = ov.opset6.result(multiply1, "res2")
-    return Model(results=[res1, res2], sinks=[assign], parameters=[input1, input2], name='model_if_readvalue')
+    return Model(results=[res1, res2], sinks=[assign], parameters=[input1, input2], name='model_readvalue')
 
 # Include: 2 readvalue, 1 static, 1 dynamic
+# =============== Model graph =============
+#     input2[1]              input3[-1]
+#        |                      |
+#     multiply1              multiply2
+#        |                      |
+#    readvalue1  input1[1]  readvalue2
+#         \       /   \       /
+#         multiply3   multiply4
+#                 \   /
+#                  add
+#                   |
+#                  res
 def model_readvalue_2():
     input1 = opset.parameter([1], Type.i32)
-
     input2 = opset.parameter([1], Type.i32)
     const1 = op.Constant(np.full((1), 2).astype(np.int32))
     multiply1 = opset.multiply(input2, const1)
@@ -57,11 +69,11 @@ def model_readvalue_2():
     multiply2 = opset.multiply(input3, const2)
     rv2, assign2 = rv_construct(multiply2, var_id="v2")
 
-    m1 = opset.multiply(input1, rv1)
-    m2 = opset.multiply(input1, rv2)
-    add = opset.add(m1, m2)
+    multiply3 = opset.multiply(input1, rv1)
+    multiply4 = opset.multiply(input1, rv2)
+    add = opset.add(multiply3, multiply4)
     res = ov.opset6.result(add, "res")
-    return Model(results=[res], sinks=[assign1, assign2], parameters=[input1, input2, input3], name='model_if_readvalue')
+    return Model(results=[res], sinks=[assign1, assign2], parameters=[input1, input2, input3], name='model_readvalue_2')
 
 def model_readvalue_optimize_with_if():
     input1 = opset.parameter([1], Type.i32)
@@ -134,6 +146,7 @@ def test_model_readvalue_2(device:str, optimize=False):
         input2 = np.array([i+1]).astype(np.int32)
         input3 = np.array([i+1]).astype(np.int32)
         if i == 2:
+            print(f"== reset_state")
             infer_request.reset_state()
             scale = (i+1) * 2
         print(f"=====================================")
@@ -142,7 +155,7 @@ def test_model_readvalue_2(device:str, optimize=False):
         print(f'== reuslt:{i+1} = {result}')
 # =====================================
 # test_model_if_readvalue('TEMPLATE')
-test_model_if_readvalue('CPU', optimize=False)
+# test_model_if_readvalue('CPU', optimize=False)
 # test_model_if_readvalue('CPU', optimize=True)
 
-# test_model_readvalue_2('CPU')
+test_model_readvalue_2('CPU')
