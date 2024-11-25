@@ -80,6 +80,11 @@ def main():
     irq = compiled_model.create_infer_request()
     irq_ref = compiled_model_ref.create_infer_request()
 
+    # Dump execution graph
+    runtime_model = compiled_model.get_runtime_model()
+
+    serialize(runtime_model, "gpu_runtime_graph.xml")
+
     input_fn = "input.npy"
     if not os.path.exists(input_fn):
         # Range[0,1)
