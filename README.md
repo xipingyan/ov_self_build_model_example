@@ -6,3 +6,7 @@ Test model constructed via cpp interface.
 
 # Python
 Test model constructed via python interface.
+
+    cd ov_self_build_model_example
+    python3 -m venv python-env
+    source python-env/bin/activate
