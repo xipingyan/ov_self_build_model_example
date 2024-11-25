@@ -1,6 +1,6 @@
 
 source ../python-env/bin/activate
-source ../../openvino/build/install/setupvars.sh # Your OV Env.
+source ../../openvino/build/install/setupvars.sh # dpc++
 
 echo "================================="
 echo "Tip:"
@@ -25,5 +25,11 @@ fi
 
 export OV_DEVICE='GPU'
 
+# Remove old cache npy data.
+rm -rf input.npy weight.npy
+
 # Test: model_matmul.py
 numactl -C 0-15 $GDB python model_matmul.py
+
+# source ../../openvino/build_gcc/install/setupvars.sh # Your OV Env.
+# numactl -C 0-15 $GDB python model_matmul.py

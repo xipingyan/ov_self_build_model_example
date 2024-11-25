@@ -199,7 +199,7 @@ def test_model_direct_indirect_pair():
     compiled_model = core.compile_model(model=model, device_name='CPU')
     compiled_refer = core.compile_model(model=model, device_name='TEMPLATE')
     irq = compiled_model.create_infer_request()
-    irq_ref = compiled_model.create_infer_request()
+    irq_ref = compiled_refer.create_infer_request()
 
     print(f" == Run test_model_direct_indirect_pair.")
     input1=np.array([1, 2]).astype(np.float32)
@@ -215,7 +215,7 @@ def test_model_direct_indirect_pair():
             irq_ref.reset_state()
 
         result = irq.infer([inp1,inp2])[compiled_model.output(0)]
-        result_ref = irq_ref.infer([inp1,inp2])[compiled_model.output(0)]
+        result_ref = irq_ref.infer([inp1,inp2])[compiled_refer.output(0)]
 
         is_expected = np.array_equal(result, result_ref)
         if is_expected:
