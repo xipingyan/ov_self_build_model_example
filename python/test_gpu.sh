@@ -21,8 +21,9 @@ export OV_DEVICE='GPU'
 
 # Some debug macro
 # export OV_GPU_Help=1
-export OV_GPU_DisableOnednn=1
+# export OV_GPU_DisableOnednn=1     # Mutmal result is wrong. I don't know why?
 # export OV_GPU_ForceImplTypes=matmal:ocl
+# export OV_GPU_ForceImplTypes=matmal:onednn
 
 # Test: model_matmul.py
 numactl -C 0-15 $GDB python model_matmul.py
