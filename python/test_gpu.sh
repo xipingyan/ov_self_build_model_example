@@ -5,8 +5,6 @@ source ../../openvino/build/install/setupvars.sh # dpc++
 echo "================================="
 echo "Tip:"
 echo "ENV: GDB=1, just for gdb --args"
-echo "ENV: RUN1=1, just runn one time inference."
-echo "ENV: EXECUTE_LOG=1, dump execution log via: export OV_CPU_DEBUG_LOG=-"
 echo "================================="
 
 if [[ -z ${GDB} ]]; then
@@ -16,17 +14,15 @@ else
     GDB="gdb --args "
 fi
 
-if [[ -z ${EXECUTE_LOG} ]]; then
-    echo "-->Not dump execution log."
-else
-    echo "-->Dump execution log: OV_CPU_DEBUG_LOG=- "
-    export OV_CPU_DEBUG_LOG=-
-fi
-
 export OV_DEVICE='GPU'
 
 # Remove old cache npy data.
-rm -rf input.npy weight.npy
+# rm -rf input.npy weight.npy
+
+# Some debug macro
+# export OV_GPU_Help=1
+export OV_GPU_DisableOnednn=1
+# export OV_GPU_ForceImplTypes=matmal:ocl
 
 # Test: model_matmul.py
 numactl -C 0-15 $GDB python model_matmul.py

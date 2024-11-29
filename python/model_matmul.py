@@ -20,19 +20,6 @@ def value(*shape):
 def new_const_dim(val):
     return op.Constant(Type.i64, Shape([len(val)]), val)
 
-
-def get_const_weight(shape):
-    weight_fn = "weight.npy"
-    if not os.path.exists(weight_fn):
-        w = np.random.rand(*shape).astype(np.float32)
-        with open(weight_fn, 'wb') as f:
-            np.save(f, w)
-            f.close()
-    with open(weight_fn, 'rb') as f:
-        weights = np.load(f)
-        f.close()
-    return op.Constant(weights)
-
 # Model
 # input[?,6,?,64]
 #     |
@@ -47,10 +34,13 @@ def get_const_weight(shape):
 #                    |
 #                 Result
 
+Weight_Size=384
+# Weight_Size=2
+# Weight_Size=16
 
-def model():
+def model_mm(weights):
     # input = opset.parameter([1, 6, -1, 64], Type.f32, name='input')
-    input = opset.parameter([1, -1, 2], Type.f32, name='input')
+    input = opset.parameter([1, -1, Weight_Size], Type.f32, name='input')
 
     # transpose = opset.transpose(input, new_const_dim([0, 2, 1, 3]))
 
@@ -58,12 +48,48 @@ def model():
     # reshape = opset.reshape(transpose, op.Constant(
     #     Type.i32, Shape([3]), [1, -1, 384]), special_zero=False)
 
-    matmul = opset.matmul(input, get_const_weight([2, 2]), False, True)
+    matmul = opset.matmul(input, weights, False, True)
 
     # add = opset.add(matmul, const([1, 1, 384]))
 
     Result = opset.result(matmul, name='model_mm_result')
     return Model([Result], [input], 'Model_MM')
+
+def prepare_weights(weight_shape):
+    weight_fn = "weight.npy"
+    if os.path.exists(weight_fn):
+        with open(weight_fn, 'rb') as f:
+            weights = np.load(f)
+            f.close()
+
+        if list(np.shape(weights)) == weight_shape:
+            print(" == saved weight and required weight shape: ", list(np.shape(weights)), "and", weight_shape, "is same, saved weight is used.")
+            return op.Constant(weights)
+
+    # Generate new weights ans save
+    w = np.random.rand(*weight_shape).astype(np.float32)
+    with open(weight_fn, 'wb') as f:
+        np.save(f, w)
+        f.close()
+    return op.Constant(w)
+
+def prepare_input(input_shape):
+    input_fn = "input.npy"
+    if os.path.exists(input_fn):
+        with open(input_fn, 'rb') as f:
+            input = np.load(f)
+            f.close()
+
+        if list(np.shape(input)) == input_shape:
+            print(" == saved input and required input shape: ", list(np.shape(input)), "and", input_shape, "is same, saved weight is used.")
+            return input
+
+    # Generate new weights ans save
+    new_input = np.random.rand(*input_shape).astype(np.float32)
+    with open(input_fn, 'wb') as f:
+        np.save(f, new_input)
+        f.close()
+    return new_input  
 
 def main():
     print("== OpenVINO Version:", ov.get_version())
@@ -73,39 +99,39 @@ def main():
         ov_device = 'CPU'
     print("== Test device is: ", ov_device)
 
+    # MatMul's weights.
+    weights = prepare_weights([Weight_Size, Weight_Size])
+
     core = Core()
-    compiled_model = core.compile_model(model=model(), device_name=ov_device)
-    compiled_model_ref = core.compile_model(model=model(), device_name='TEMPLATE')
+    model = model_mm(weights)
+    compiled_model = core.compile_model(model=model, device_name=ov_device)
+    compiled_model_ref = core.compile_model(model=model, device_name='TEMPLATE')
 
     irq = compiled_model.create_infer_request()
     irq_ref = compiled_model_ref.create_infer_request()
 
     # Dump execution graph
     runtime_model = compiled_model.get_runtime_model()
+    if os.getenv('dump_runtime_model') is not None:
+        serialize(runtime_model, "gpu_runtime_graph.xml")
 
-    serialize(runtime_model, "gpu_runtime_graph.xml")
-
-    input_fn = "input.npy"
-    if not os.path.exists(input_fn):
-        # Range[0,1)
-        # input = [value(1, 6, 1500, 64)]
-        input = value(1, 5, 2)
-        with open(input_fn, 'wb') as f:
-            np.save(f, input)
-            f.close()
-    with open(input_fn, 'rb') as f:
-        input = np.load(f)
-        f.close()
-
+    # Ready input:
+    input = prepare_input([1, 2, Weight_Size])
     # print("== input: ", input)
 
     result = irq.infer(input)[compiled_model.output(0)]
     result_ref = irq_ref.infer(input)[compiled_model_ref.output(0)]
 
     print('== Result shape:', result.shape)
+    is_same = np.allclose(result.data.tolist(), result_ref.data.tolist(), 0.001, 0.001, False)
     print('== Result and Reference are',
-        'same. Success.' if np.allclose(result.data.tolist(), result_ref.data.tolist(), 0.001, 0.001, False) else 'different. Fail.')
-    # print("result=",result.data.tolist())
-    # print("result_ref=",result_ref.data.tolist())
+          'same. Success.' if is_same else 'different. Fail.')
+    if is_same is False:
+        print("  == result     data =", np.round(result.data.tolist()[0][0][0:10], 4))
+        print("  == result_ref data =", np.round(result_ref.data.tolist()[0][0][0:10], 4))
+        
+        print("  == result    [0] =", type(result.data.tolist()[0][0][0]))
+        print("  == result_ref[0] =", type(result_ref.data.tolist()[0][0][0]))
+
 
 main()
