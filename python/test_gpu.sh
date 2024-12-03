@@ -1,6 +1,8 @@
 
 source ../python-env/bin/activate
 source ../../openvino/build/install/setupvars.sh # dpc++
+# source ../../ov_orig/openvino/build/install/setupvars.sh # dpc++
+
 
 echo "================================="
 echo "Tip:"
@@ -24,6 +26,14 @@ export OV_DEVICE='GPU'
 # export OV_GPU_DisableOnednn=1     # Mutmal result is wrong. I don't know why?
 # export OV_GPU_ForceImplTypes=matmal:ocl
 # export OV_GPU_ForceImplTypes=matmal:onednn
+
+# Debug log:
+# DISABLED = 0,
+# INFO = 1,
+# LOG = 2,
+# TRACE = 3,
+# TRACE_DETAIL = 4
+# OV_GPU_Verbose=4
 
 # Test: model_matmul.py
 numactl -C 0-15 $GDB python model_matmul.py

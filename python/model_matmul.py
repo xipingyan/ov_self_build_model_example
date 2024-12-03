@@ -34,13 +34,14 @@ def new_const_dim(val):
 #                    |
 #                 Result
 
-Weight_Size=384
+Weight_y=192
+Weight_x=384
 # Weight_Size=2
 # Weight_Size=16
 
 def model_mm(weights):
     # input = opset.parameter([1, 6, -1, 64], Type.f32, name='input')
-    input = opset.parameter([1, -1, Weight_Size], Type.f32, name='input')
+    input = opset.parameter([1, -1, Weight_x], Type.f32, name='input')
 
     # transpose = opset.transpose(input, new_const_dim([0, 2, 1, 3]))
 
@@ -100,7 +101,7 @@ def main():
     print("== Test device is: ", ov_device)
 
     # MatMul's weights.
-    weights = prepare_weights([Weight_Size, Weight_Size])
+    weights = prepare_weights([Weight_y, Weight_x])
 
     core = Core()
     model = model_mm(weights)
@@ -116,7 +117,7 @@ def main():
         serialize(runtime_model, "gpu_runtime_graph.xml")
 
     # Ready input:
-    input = prepare_input([1, 2, Weight_Size])
+    input = prepare_input([1, 2, Weight_x])
     # print("== input: ", input)
 
     result = irq.infer(input)[compiled_model.output(0)]
