@@ -64,7 +64,7 @@ def prepare_weights(weight_shape):
             f.close()
 
         if list(np.shape(weights)) == weight_shape:
-            print(" == saved weight and required weight shape: ", list(np.shape(weights)), "and", weight_shape, "is same, saved weight is used.")
+            print(" == cached weight and required weight shape: ", list(np.shape(weights)), "and", weight_shape, "is same, cached weight is used.")
             return op.Constant(weights)
 
     # Generate new weights ans save
@@ -82,7 +82,7 @@ def prepare_input(input_shape):
             f.close()
 
         if list(np.shape(input)) == input_shape:
-            print(" == saved input and required input shape: ", list(np.shape(input)), "and", input_shape, "is same, saved weight is used.")
+            print(" == cached input and required input shape: ", list(np.shape(input)), "and", input_shape, "is same, cached weight is used.")
             return input
 
     # Generate new weights ans save
@@ -100,16 +100,21 @@ def main():
         ov_device = 'CPU'
     print("== Test device is: ", ov_device)
 
+    run_template = False
+    print("== run_template: ", run_template)
+
     # MatMul's weights.
     weights = prepare_weights([Weight_y, Weight_x])
 
     core = Core()
     model = model_mm(weights)
     compiled_model = core.compile_model(model=model, device_name=ov_device)
-    compiled_model_ref = core.compile_model(model=model, device_name='TEMPLATE')
+    if run_template:
+        compiled_model_ref = core.compile_model(model=model, device_name='TEMPLATE')
 
     irq = compiled_model.create_infer_request()
-    irq_ref = compiled_model_ref.create_infer_request()
+    if run_template:
+        irq_ref = compiled_model_ref.create_infer_request()
 
     # Dump execution graph
     runtime_model = compiled_model.get_runtime_model()
@@ -121,18 +126,21 @@ def main():
     # print("== input: ", input)
 
     result = irq.infer(input)[compiled_model.output(0)]
-    result_ref = irq_ref.infer(input)[compiled_model_ref.output(0)]
-
     print('== Result shape:', result.shape)
-    is_same = np.allclose(result.data.tolist(), result_ref.data.tolist(), 0.001, 0.001, False)
-    print('== Result and Reference are',
-          'same. Success.' if is_same else 'different. Fail.')
-    if is_same is False:
-        print("  == result     data =", np.round(result.data.tolist()[0][0][0:10], 4))
-        print("  == result_ref data =", np.round(result_ref.data.tolist()[0][0][0:10], 4))
-        
-        print("  == result    [0] =", type(result.data.tolist()[0][0][0]))
-        print("  == result_ref[0] =", type(result_ref.data.tolist()[0][0][0]))
+    print('== Result.data.tolist()[0][0][0:5]:', result.data.tolist()[0][0][0:5])
+
+    if run_template:
+        result_ref = irq_ref.infer(input)[compiled_model_ref.output(0)]
+
+        is_same = np.allclose(result.data.tolist(), result_ref.data.tolist(), 0.001, 0.001, False)
+        print('== Result and Reference are',
+            'same. Success.' if is_same else 'different. Fail.')
+        if is_same is False:
+            print("  == result     data =", np.round(result.data.tolist()[0][0][0:10], 4))
+            print("  == result_ref data =", np.round(result_ref.data.tolist()[0][0][0:10], 4))
+            
+            print("  == result    [0] =", type(result.data.tolist()[0][0][0]))
+            print("  == result_ref[0] =", type(result_ref.data.tolist()[0][0][0]))
 
 
 main()

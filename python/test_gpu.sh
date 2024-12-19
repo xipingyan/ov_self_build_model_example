@@ -1,7 +1,9 @@
 
+# source /opt/intel/oneapi/setvars.sh
 source ../python-env/bin/activate
 source ../../openvino/build/install/setupvars.sh # dpc++
 # source ../../ov_orig/openvino/build/install/setupvars.sh # dpc++
+# source /mnt/xiping/openvino/build/install/setupvars.sh
 
 
 echo "================================="
@@ -36,7 +38,7 @@ export OV_DEVICE='GPU'
 # OV_GPU_Verbose=4
 
 # Test: model_matmul.py
-numactl -C 0-15 $GDB python model_matmul.py
+OV_GPU_Verbose=4 numactl -C 0-15 $GDB python model_matmul.py
 
 # source ../../openvino/build_gcc/install/setupvars.sh # Your OV Env.
 # numactl -C 0-15 $GDB python model_matmul.py
