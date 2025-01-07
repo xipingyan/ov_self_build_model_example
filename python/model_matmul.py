@@ -126,9 +126,11 @@ def main():
     # print("== input: ", input)
 
     result = irq.infer(input)[compiled_model.output(0)]
+    print('===========================================')
     print('== Result shape:', result.shape)
-    print('== Result.data.tolist()[0][0][0:5]:', result.data.tolist()[0][0][0:10])
-    print('  == Expected [0:5] result: 96.4324 96.0162 99.5264 95.8511 94.5341 96.6835 91.6944 99.1996 95.2305 95.4591')
+    print('  Real        Result[0:5]:', np.round(result.data.tolist()[0][0][0:10], 4))
+    print('  Expected Server95 [0:5]:', '[96.4324 96.0162 99.5264 95.8511 94.5341 96.6835 91.6944 99.1996 95.2305 95.4591]')
+    print('  Expected Server58 [0:5]:', '[93.714  97.3829 95.014  94.6584 98.0333 95.1286 95.6176 90.9323 94.3044 94.2531]')
 
     if run_template:
         result_ref = irq_ref.infer(input)[compiled_model_ref.output(0)]
