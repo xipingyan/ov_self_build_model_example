@@ -51,9 +51,20 @@ def model_mm(weights):
 
     matmul = opset.matmul(input, weights, False, True)
 
-    # add = opset.add(matmul, const([1, 1, 384]))
+    new_shape = np.array([1, 0, 16, 12], dtype=np.int32)
+    reshape = opset.reshape(matmul, new_shape, True)
+    # filter weights should have shape M x C x kH x kW
+    input_filter = np.array([[[[0.1, 0.2, 0.3],[0.1, 0.2, 0.3],[0.1, 0.2, 0.3]]]], dtype=np.float32)
+    conv = opset.convolution(reshape, input_filter, np.array([1, 1]), np.array(
+        [1, 1]), np.array([1, 1]), np.array([1, 1]), name="my_convolution")
+    Result = opset.result(conv, name='model_mm_result')
 
-    Result = opset.result(matmul, name='model_mm_result')
+    # dim_const = opset.constant(np.array([1], dtype=np.int32))
+    # reduce_mean = opset.reduce_mean(matmul, dim_const, True, 'my_reduce_mean')
+    # Result = opset.result(reduce_mean, name='model_mm_result')
+
+    # Result = opset.result(matmul, name='model_mm_result')
+
     return Model([Result], [input], 'Model_MM')
 
 def prepare_weights(weight_shape):
@@ -122,15 +133,19 @@ def main():
         serialize(runtime_model, "gpu_runtime_graph.xml")
 
     # Ready input:
-    input = prepare_input([1, 2, Weight_x])
+    input = prepare_input([1, 1, Weight_x])
     # print("== input: ", input)
 
+    # for outp in compiled_model.outputs():
+    #     print("  output=", outp)
     result = irq.infer(input)[compiled_model.output(0)]
+
     print('===========================================')
     print('== Result shape:', result.shape)
-    print('  Real        Result[0:5]:', np.round(result.data.tolist()[0][0][0:10], 4))
+    print('  Real        Result[0:5]:', np.round(result.data.tolist()[0][0][0][0:10], 4))
     print('  Expected Server95 [0:5]:', '[96.4324 96.0162 99.5264 95.8511 94.5341 96.6835 91.6944 99.1996 95.2305 95.4591]')
     print('  Expected Server58 [0:5]:', '[93.714  97.3829 95.014  94.6584 98.0333 95.1286 95.6176 90.9323 94.3044 94.2531]')
+    print('  Expected Server95 with oneDNN [0:5]:', '[90.7771 107.6055 106.7492 107.5771 108.513  109.1638 107.6343 108.1289 109.4889 107.0539]')
 
     if run_template:
         result_ref = irq_ref.infer(input)[compiled_model_ref.output(0)]
@@ -139,11 +154,11 @@ def main():
         print('== Result and Reference are',
             'same. Success.' if is_same else 'different. Fail.')
         if is_same is False:
-            print("  == result     data =", np.round(result.data.tolist()[0][0][0:10], 4))
-            print("  == result_ref data =", np.round(result_ref.data.tolist()[0][0][0:10], 4))
+            print("  == result     data =", np.round(result.data.tolist()[0][0][0][0:10], 4))
+            print("  == result_ref data =", np.round(result_ref.data.tolist()[0][0][0][0:10], 4))
             
-            print("  == result    [0] =", type(result.data.tolist()[0][0][0]))
-            print("  == result_ref[0] =", type(result_ref.data.tolist()[0][0][0]))
+            print("  == result    [0] =", type(result.data.tolist()[0][0][0][0]))
+            print("  == result_ref[0] =", type(result_ref.data.tolist()[0][0][0][0]))
 
 
 main()

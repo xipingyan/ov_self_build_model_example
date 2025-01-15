@@ -38,7 +38,10 @@ export OV_DEVICE='GPU'
 # OV_GPU_Verbose=4
 
 # Test: model_matmul.py
-OV_GPU_Verbose=4 numactl -C 0-15 $GDB python model_matmul.py
+# OV_GPU_DumpLayersRaw=1 OV_GPU_DumpLayersPath=./output_binary/ OV_GPU_Verbose=4 numactl -C 0-31 $GDB python model_matmul.py
+# OV_GPU_DumpLayersRaw=1 OV_GPU_DumpLayersPath=./output_binary/ numactl -C 0-31 $GDB python model_matmul.py
+# OV_GPU_Verbose=4 numactl -C 0-31 $GDB python model_matmul.py
+numactl -C 0-31 $GDB python model_matmul.py
 
 # source ../../openvino/build_gcc/install/setupvars.sh # Your OV Env.
 # numactl -C 0-15 $GDB python model_matmul.py
