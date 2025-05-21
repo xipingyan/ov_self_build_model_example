@@ -10,3 +10,7 @@ Test model constructed via python interface.
     cd ov_self_build_model_example
     python3 -m venv python-env
     source python-env/bin/activate
+
+    <!-- update openvino -->
+    pip install openvino
+    python -c "import openvino as ov; print(ov.get_version())"

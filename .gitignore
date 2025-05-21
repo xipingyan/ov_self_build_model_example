@@ -1,6 +1,7 @@
 build
 .vscode
 python-env
+*.pt
 
 cpu_debug.log
 python/xxx_0.bin
