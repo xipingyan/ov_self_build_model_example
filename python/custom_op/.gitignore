@@ -1,0 +1,2 @@
+*.onnx
+output_ir
