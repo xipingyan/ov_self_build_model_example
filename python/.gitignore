@@ -1,2 +1,3 @@
 *.npy
 output_binary
+__pycache__

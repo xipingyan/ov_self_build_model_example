@@ -11,7 +11,8 @@ from openvino import opset8 as opset
 # from openvino.runtime.passes import Manager
 import numpy as np
 import time
-import os
+
+from utils.comm_pt import cache_randn_1d, cache_randn_3d
 
 # Torch: layer_norm -> OV: mvn+multply+add
 def ov_model(weight_a:torch.tensor, bias_a, default_eps, normalized_shape_a):
@@ -30,33 +31,15 @@ def ov_model(weight_a:torch.tensor, bias_a, default_eps, normalized_shape_a):
     Result = opset.result(add_node, name='output')
     return Model([Result], [input], 'model_layer_norm')
 
-def cache_randn(batch, sentence_length, embedding_dim):
-    dump_fn = "embedding.pt"
-    if os.path.exists(dump_fn):
-        embedding = torch.load(dump_fn)
-    else:
-        embedding = torch.randn(batch, sentence_length, embedding_dim, dtype=torch.float32)
-        torch.save(embedding, dump_fn)
-    return embedding
-
-def cache_randn_1d(embedding_dim, cache_fn):
-    dump_fn = cache_fn
-    if os.path.exists(dump_fn):
-        embedding = torch.load(dump_fn)
-    else:
-        embedding = torch.randn(embedding_dim, dtype=torch.float32)
-        torch.save(embedding, dump_fn)
-    return embedding
-
 def test_layer_norm():
     # https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html#torch.nn.LayerNorm
     batch, sentence_length, embedding_dim = 20, 5, 10
-    embedding = cache_randn(batch, sentence_length, embedding_dim)
+    embedding = cache_randn_3d(batch, sentence_length, embedding_dim, "embedding_3d.pt", dtype=torch.float32)
 
     default_eps = 1e-5
     normalized_shape_a = (embedding.shape[-1],)
-    weight_a = cache_randn_1d(normalized_shape_a, "weight.pt")
-    bias_a = cache_randn_1d(normalized_shape_a, "bias.pt")
+    weight_a = cache_randn_1d(normalized_shape_a, "weight.pt", dtype=torch.float32)
+    bias_a = cache_randn_1d(normalized_shape_a, "bias.pt", dtype=torch.float32)
     result_pt = F.layer_norm(embedding, normalized_shape_a, weight=weight_a, bias=bias_a, eps=default_eps)
     print(f"== result_pt shape: {result_pt.shape}")
     print(f"== first line result:\n{result_pt.cpu().tolist()[0][0][:6]}")
@@ -76,6 +59,7 @@ def test_layer_norm():
 
     bclose = torch.isclose(ov_pt_output, result_pt, 1e-5, 1e-5).all()
     print(f"== compare 2 result, torch.isclose(ov_pt_output, result_pt, 1e-5, 1e-5).all() = {bclose}")
+    print(f"== Test {'pass' if bclose else 'fail'}.")
 
 if __name__ == "__main__":
     print("== Start to test: 'torch.nn.LayerNorm' VS 'OV implementation(MVN+Multply+Add)'")
