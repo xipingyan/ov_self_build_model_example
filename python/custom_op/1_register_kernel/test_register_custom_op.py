@@ -23,6 +23,12 @@ def run_ov_model(input_pt, onnx_model_fn):
     core.add_extension(ext_path)
 
     model = core.read_model(onnx_model_fn)
+
+    if not os.path.exists("export_ov_model"):
+        os.mkdir("export_ov_model")
+    print("== Start to save OpenVINO IR.")
+    ov.save_model(model, "export_ov_model/custom_model.xml")
+
     compiled_model = core.compile_model(model, 'CPU')
 
     input = np.array(input_pt.cpu().tolist()).astype(np.float32)
@@ -71,11 +77,28 @@ if __name__ == "__main__":
 
     # Export ONNX
     onnx_model_fn = 'my_model.onnx'
-    with torch.no_grad():
-        torch.onnx.export(model_pt, inp, onnx_model_fn,
-                          input_names=['input'],
-                          output_names=['output'],
-                          operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
+    
+    input_names = ["input"]
+    output_names = ["output"]
+
+    # if False: # With static shape.
+    if True: # With dynamic shape
+        dynamic_axes = {
+            "input": {0: "batch_size"},  # 0 is the index of the batch dimension
+            "output": {0: "batch_size"} # 0 is the index of the batch dimension
+        }
+        with torch.no_grad():
+            torch.onnx.export(model_pt, inp, onnx_model_fn,
+                            input_names=input_names,
+                            output_names=output_names,
+                            dynamic_axes=dynamic_axes,
+                            operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
+    else:
+        with torch.no_grad():
+            torch.onnx.export(model_pt, inp, onnx_model_fn,
+                            input_names=input_names,
+                            output_names=output_names,
+                            operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
 
     ref = model_pt(inp)
     rslt_ov = torch.tensor(run_ov_model(inp, onnx_model_fn))
