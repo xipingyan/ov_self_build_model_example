@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from torch.autograd import Variable
+
 import os
 import sys
 sys.path.append("../../")
@@ -11,63 +13,73 @@ from utils.comm_pt import cache_randn_1d, cache_randn_3d
 from openvino import opset8 as opset
 from openvino import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
 
-def ov_model(weight_a:torch.tensor, bias_a, default_eps, normalized_shape_a):
-    input = opset.parameter([-1, -1, 10], Type.f32, name='input0')
-
-    axes_node = opset.constant([2], dtype=ov.Type.i64, name="mvn_axes")
-    normalize_variance = True
-    mvn_node = opset.mvn(input, axes_node, normalize_variance, default_eps, eps_mode='inside_sqrt')
-
-    const_weight = opset.constant(weight_a.cpu().tolist(), Type.f32, "weight")
-    multiple_node = opset.multiply(mvn_node, const_weight)
-
-    const_bias = opset.constant(bias_a.cpu().tolist(), Type.f32, "weight")
-    add_node = opset.add(multiple_node, const_bias)
-
-    Result = opset.result(add_node, name='output')
-    return Model([Result], [input], 'model_layer_norm')
-
-def test_pt_ov_model():
-    # Torch model
-    batch, sentence_length, embedding_dim = 20, 5, 10
-    embedding = cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d.pt")
-    default_eps = 1e-5
-    normalized_shape_a = (embedding.shape[-1],)
-    weight_a = cache_randn_1d(normalized_shape_a, "./tmp/weight.pt")
-    bias_a = cache_randn_1d(normalized_shape_a, "./tmp/bias.pt")
-    result_pt = F.layer_norm(embedding, normalized_shape_a, weight=weight_a, bias=bias_a, eps=default_eps)
-
-    # Custom OP of Pytorch (Add const)
-    # ======================================
-    const_bias = 0.1
-    result_pt = result_pt + const_bias
-    # ======================================
-    print(f"== **************************************")
-    print(f"== result_pt shape: {result_pt.shape}")
-    print(f"== first line result:\n{result_pt.cpu().tolist()[0][0][:6]}")
-    print(f"== last line result:\n{result_pt.cpu().tolist()[0][4][:6]}")
+def run_ov_model(input_pt, onnx_model_fn):
+    print("== Start to run OV model.")
+    ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
+    # ext_path = os.getenv('CUSTOM_OP_LIB')
 
     # OV model:
     core = Core()
-    m = ov_model(weight_a, bias_a, default_eps, normalized_shape_a)
-    # Register custom OP of OV
+    core.add_extension(ext_path)
 
-    compiled_model = core.compile_model(model=m, device_name="CPU")
+    model = core.read_model(onnx_model_fn)
+    compiled_model = core.compile_model(model, 'CPU')
 
-    input = np.array(embedding.cpu().tolist()).astype(np.float32)
-    result_ov = compiled_model(input)
-    print(f"== **************************************")
-    print(f"== result_ov shape: {result_ov['output'].shape}")
-    print(f"== first line result:\n{result_ov['output'].tolist()[0][0][:6]}")
-    print(f"== last line result:\n{result_ov['output'].tolist()[0][4][:6]}\n")
+    input = np.array(input_pt.cpu().tolist()).astype(np.float32)
+    out = compiled_model({"input": input})
+    return out["output"].tolist()
 
-    output_node = result_ov['output']
-    ov_pt_output = torch.tensor(output_node.tolist(), dtype=torch.float32)
-    # ov_pt_output = ov_pt_output + const_bias
-    bclose = torch.isclose(ov_pt_output, result_pt, 1e-5, 1e-5).all()
-    print(f"== **************************************")
-    print(f"== compare 2 result, torch.isclose(ov_pt_output, result_pt, 1e-5, 1e-5).all() = {bclose}")
-    print(f"== Test {'pass' if bclose else 'fail'}.")
+class MyAddPyOP(torch.autograd.Function):
+    # Overriding the symbolic method in 'torch.autograd' Function is crucial 
+    # when you want to export your custom PyTorch operation to formats like ONNX 
+    @staticmethod
+    def symbolic(g, x, bias):
+        bias = torch.tensor(bias)
+        bias = g.op("Constant", value_t=bias)
+        # g.op(op_name, input1...)
+        return g.op('MyAdd', x, bias)
+
+    @staticmethod
+    def forward(self, x, bias):
+        y = x + bias
+        return y
+    
+class MyPytorchModel(nn.Module):
+    def __init__(self, last_bias):
+        super(MyPytorchModel, self).__init__()
+        self.last_bias = last_bias
+        self.norm = F.layer_norm
+        self.default_eps = 1e-5
+        self.weight_a = cache_randn_1d([20, 5, 10], "./tmp/weight.pt")
+        self.bias_a = cache_randn_1d([20, 5, 10], "./tmp/bias.pt")
+        self.my_add_py_op = MyAddPyOP
+
+    def forward(self, x):
+        normalized_shape_a = (x.shape[-1],)
+        r1 = self.norm(x, normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
+        r2 = self.my_add_py_op.apply(r1, self.last_bias)
+        return r2
+
 
 if __name__ == "__main__":
-    test_pt_ov_model()
+    # Original model(pytorch model)
+    model_pt = MyPytorchModel(0.1)
+    
+    batch, sentence_length, embedding_dim = 20, 5, 10
+    inp = cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d.pt")
+    model_pt.eval()
+
+    # Export ONNX
+    onnx_model_fn = 'my_model.onnx'
+    with torch.no_grad():
+        torch.onnx.export(model_pt, inp, onnx_model_fn,
+                          input_names=['input'],
+                          output_names=['output'],
+                          operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
+
+    ref = model_pt(inp)
+    rslt_ov = torch.tensor(run_ov_model(inp, onnx_model_fn))
+    # print("== ref=", ref[0][0][:3])
+    # print("== rslt_ov=", rslt_ov[0][0][:3])
+    print("== Compare result, Torch VS OV =", 
+          torch.isclose(ref, rslt_ov, 1e-5, 1e-5).all().numpy())
