@@ -55,17 +55,16 @@ class MyPytorchModel(nn.Module):
         super(MyPytorchModel, self).__init__()
         self.last_bias = last_bias
         self.norm = F.layer_norm
+        self.normalized_shape_a = (10,) # Must be const.
         self.default_eps = 1e-5
         self.weight_a = cache_randn_1d([20, 5, 10], "./tmp/weight.pt")
         self.bias_a = cache_randn_1d([20, 5, 10], "./tmp/bias.pt")
         self.my_add_py_op = MyAddPyOP
 
     def forward(self, x):
-        normalized_shape_a = (x.shape[-1],)
-        r1 = self.norm(x, normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
+        r1 = self.norm(x.contiguous(), self.normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
         r2 = self.my_add_py_op.apply(r1, self.last_bias)
         return r2
-
 
 if __name__ == "__main__":
     # Original model(pytorch model)
@@ -76,16 +75,17 @@ if __name__ == "__main__":
     model_pt.eval()
 
     # Export ONNX
-    onnx_model_fn = 'my_model.onnx'
+    onnx_model_fn = 'my_model_static.onnx'
     
     input_names = ["input"]
     output_names = ["output"]
 
     # if False: # With static shape.
     if True: # With dynamic shape
+        onnx_model_fn = 'my_model_dynamic.onnx'
         dynamic_axes = {
-            "input": {0: "batch_size"},  # 0 is the index of the batch dimension
-            "output": {0: "batch_size"} # 0 is the index of the batch dimension
+            "input": {0: "batch"},  # 0 is the index of the batch dimension
+            "output": {0: "batch"} # 0 is the index of the batch dimension
         }
         with torch.no_grad():
             torch.onnx.export(model_pt, inp, onnx_model_fn,
