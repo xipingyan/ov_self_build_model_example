@@ -1,1 +1,3 @@
 tmp
+export_ov_model
+*.onnx

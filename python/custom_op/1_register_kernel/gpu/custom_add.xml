@@ -1,7 +1,6 @@
 <CustomLayer name="MyAdd" type="SimpleGPU" version="1">
   <Kernel entry="custom_add_kernel">
     <Source filename="custom_add.cl"/>
-    <Define name="neg_slope" type="float" param="negative_slope" default="0.0"/>
   </Kernel>
   <Buffers>
     <Tensor arg-index="0" type="input" port-index="0" format="BFYX"/>
