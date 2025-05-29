@@ -31,6 +31,7 @@ bool MyAdd::visit_attributes(ov::AttributeVisitor &visitor)
 
 bool MyAdd::evaluate(ov::TensorVector &outputs, const ov::TensorVector &inputs) const
 {
+    std::cout << "== MyAdd::evaluate is called." << std::endl;
     float *inpData = reinterpret_cast<float *>(const_cast<void*>(inputs[0].data()));
     if (inputs[1].get_element_type() != ov::element::f32)
         OPENVINO_THROW("Unexpected bias type: " + inputs[1].get_element_type().to_string());

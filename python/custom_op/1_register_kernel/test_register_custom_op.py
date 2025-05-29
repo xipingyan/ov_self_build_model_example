@@ -18,9 +18,16 @@ def run_ov_model(input_pt, onnx_model_fn):
     ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
     # ext_path = os.getenv('CUSTOM_OP_LIB')
 
+    device='CPU'
+    device='GPU'
+
     # OV model:
     core = Core()
     core.add_extension(ext_path)
+    
+    print(f"== device = {device}.")
+    if device == 'GPU':
+        core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
     model = core.read_model(onnx_model_fn)
 
@@ -29,7 +36,7 @@ def run_ov_model(input_pt, onnx_model_fn):
     print("== Start to save OpenVINO IR.")
     ov.save_model(model, "export_ov_model/custom_model.xml")
 
-    compiled_model = core.compile_model(model, 'CPU')
+    compiled_model = core.compile_model(model, device)
 
     input = np.array(input_pt.cpu().tolist()).astype(np.float32)
     out = compiled_model({"input": input})
@@ -57,8 +64,8 @@ class MyPytorchModel(nn.Module):
         self.norm = F.layer_norm
         self.normalized_shape_a = (10,) # Must be const.
         self.default_eps = 1e-5
-        self.weight_a = cache_randn_1d([20, 5, 10], "./tmp/weight.pt")
-        self.bias_a = cache_randn_1d([20, 5, 10], "./tmp/bias.pt")
+        self.weight_a = cache_randn_1d([10], "./tmp/weight.pt")
+        self.bias_a = cache_randn_1d([10], "./tmp/bias.pt")
         self.my_add_py_op = MyAddPyOP
 
     def forward(self, x):
@@ -80,8 +87,8 @@ if __name__ == "__main__":
     input_names = ["input"]
     output_names = ["output"]
 
-    # if False: # With static shape.
-    if True: # With dynamic shape
+    if False: # With static shape.
+    # if True: # With dynamic shape
         onnx_model_fn = 'my_model_dynamic.onnx'
         dynamic_axes = {
             "input": {0: "batch"},  # 0 is the index of the batch dimension
@@ -102,7 +109,7 @@ if __name__ == "__main__":
 
     ref = model_pt(inp)
     rslt_ov = torch.tensor(run_ov_model(inp, onnx_model_fn))
-    # print("== ref=", ref[0][0][:3])
-    # print("== rslt_ov=", rslt_ov[0][0][:3])
+    print("== ref=", ref[0][0][:3])
+    print("== rslt_ov=", rslt_ov[0][0][:3])
     print("== Compare result, Torch VS OV =", 
           torch.isclose(ref, rslt_ov, 1e-5, 1e-5).all().numpy())
