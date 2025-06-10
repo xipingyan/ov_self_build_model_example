@@ -15,14 +15,23 @@ def model(FeaDim):
 
     # Get middle value from [-1,-1,FeaDim], for example: get 2 from shape[1,2,3]
     last_seq_id = opset.gather(input_ids_shape, new_const_1_dim(1), new_const_1_dim(0))
+
     # idx start from 0, so need to reduce 1.
     indics = opset.add(last_seq_id, op.Constant(Type.i64, Shape([1]), [-1]))
 
     # Get last seq fea, same to input_ids[:,-1,:]
     last_logits = opset.gather(input_ids, indics, new_const_1_dim(1))
+    
+    if 0: # Infer to get reshaped target shape.
+        fea_dim = opset.gather(input_ids_shape, new_const_1_dim(2), new_const_1_dim(0))
+        fea_dim= opset.add(fea_dim, op.Constant(Type.i64, Shape([1]), [-1]))
+        neg_one = opset.constant([-1], dtype=Type.i64)
+        target_shape = opset.concat([neg_one, fea_dim], axis=0)
+    else: # Get it from const.
+        target_shape = opset.constant([-1, FeaDim], dtype=ov.Type.i64)
 
     # Reshape from [-1, 1, FeaDim] to [-1, FeaDim]
-    reshape = opset.reshape(last_logits, opset.constant([-1, FeaDim], dtype=ov.Type.i64), special_zero=True)
+    reshape = opset.reshape(last_logits, target_shape, special_zero=True)
  
     Result = opset.result(reshape, name='output')
     return Model([Result], [input_ids], 'model_gather')

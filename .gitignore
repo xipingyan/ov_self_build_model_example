@@ -12,3 +12,4 @@ python/xxx_1.xml
 python/.env
 python/env_new.txt
 python/env_old.txt
+tmp_model_*
