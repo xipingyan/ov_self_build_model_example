@@ -14,7 +14,7 @@ def cache_randn_3d(batch, sentence_length, embedding_dim, cache_fn:str, dtype=to
     if os.path.exists(cache_fn) and regenerate is False:
         tensor_3d = torch.load(cache_fn)
     else:
-        tensor_3d = torch.randn(batch, sentence_length, embedding_dim, dtype=torch.float32)
+        tensor_3d = torch.randn(batch, sentence_length, embedding_dim, dtype=dtype)
         torch.save(tensor_3d, cache_fn)
     return tensor_3d
 
