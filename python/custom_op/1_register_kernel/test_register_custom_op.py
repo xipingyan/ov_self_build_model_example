@@ -109,7 +109,7 @@ def main(device, dynamic_shape):
     onnx_model_fn = f'my_model_{device}_{dynamic_shape}.onnx'
     
     DirectCallOV = True
-    # DirectCallOV = False
+    DirectCallOV = False
     if not DirectCallOV:
         # Export ONNX
         input_names = ["input"]
