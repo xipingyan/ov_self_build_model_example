@@ -96,6 +96,7 @@ def main(device, shape_mode):
     batch, sentence_length, embedding_dim = 20, 5, 10
     inp0 = cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d_0.pt", dtype=torch.float32)
     inp1 = cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1.pt", dtype=torch.float32)
+    inp1_1 = cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1_1.pt", dtype=torch.float32)
     inp2 = cache_randn_3d(2, sentence_length, embedding_dim, "./tmp/input_3d_2.pt", dtype=torch.float32)
 
     model_pt.eval()
@@ -130,9 +131,10 @@ def main(device, shape_mode):
     print(f"== Start to run torch model.")
     ref0 = model_pt(inp0)
     ref1 = model_pt(inp1)
+    ref1_1 = model_pt(inp1_1)
     ref2 = model_pt(inp2)
 
-    rslts_ov = run_ov_model([inp0, inp1, inp2], None if DirectCallOV else onnx_model_fn, device, shape_mode)
+    rslts_ov = run_ov_model([inp0, inp1, ref1_1, inp2], None if DirectCallOV else onnx_model_fn, device, shape_mode)
     rslts_ov = [torch.tensor(rslt_ov) for rslt_ov in rslts_ov]
     print("== ref  =", ref0[0][0][:3])
     print("== rslt_ov=", rslts_ov[0][0][0][:3])
@@ -143,7 +145,8 @@ def main(device, shape_mode):
     print(f"== Compare result with T: {rtol, atol}, Torch VS OV =", 
           torch.isclose(ref0, rslts_ov[0], rtol, atol).all().numpy(), 
           torch.isclose(ref1, rslts_ov[1], rtol, atol).all().numpy(),
-          torch.isclose(ref2, rslts_ov[2], rtol, atol).all().numpy())
+          torch.isclose(ref1_1, rslts_ov[2], rtol, atol).all().numpy(),
+          torch.isclose(ref2, rslts_ov[3], rtol, atol).all().numpy())
 
 if __name__ == "__main__":
     print("ov version: ", ov.get_version())
