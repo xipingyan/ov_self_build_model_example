@@ -103,6 +103,7 @@ def main(device, shape_mode):
     onnx_model_fn = f'my_model_{device}_{shape_mode}.onnx'
     
     DirectCallOV = True
+    DirectCallOV = False
     if not DirectCallOV:
         # Export ONNX
         input_names = ["input"]

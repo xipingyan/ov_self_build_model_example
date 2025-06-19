@@ -7,6 +7,7 @@ Refer: https://docs.openvino.ai/2025/documentation/openvino-extensibility/custom
 1. Build cpp custom kernel(MyAdd)
 
     cd cpu/ && make build && cd build
+    source openvino/build/install/setupvars.sh  # Source your self built openvino.
     cmake ..
     make -j20
     
