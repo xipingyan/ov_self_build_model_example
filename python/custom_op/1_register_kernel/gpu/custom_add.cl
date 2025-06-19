@@ -11,11 +11,12 @@ __kernel void custom_add_kernel(
 
     const float my_bias = 0.1f;
 
+    outp[id] = inp0[id] + inp1[0];
+    // outp[id] = inp0[id] + 0.1f;
+
+    // printf("b=%d, ", b);
     // if (id == 0) {
     //     printf("inp0[0]=%.2f, inp1[0]=%.2f, b=%d, f=%d, y=%d, cur_id=%d, my_bias=%.2f, outp[0]=%.2f\n", 
     //         (float)inp0[0], (float)inp1[0], b, f, y, id, my_bias, (float)outp[0]);
     // }
-
-    outp[id] = inp0[id] + inp1[0];
-    // outp[id] = inp0[id] + 0.1f;
 }

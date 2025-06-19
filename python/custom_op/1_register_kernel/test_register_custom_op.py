@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.autograd import Variable
+import copy
 
 import os
 import sys
@@ -13,7 +14,7 @@ from utils.comm_pt import cache_randn_1d, cache_randn_3d
 from openvino import opset8 as opset
 from openvino import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
 
-def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', shape_mode='static'):
+def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=False):
     print(" == Start to run OV model.")
     ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
     # ext_path = os.getenv('CUSTOM_OP_LIB')
@@ -26,7 +27,7 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', shape_mode='static
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    ov_ir = f"export_ov_model/openvino_model_{device}_{shape_mode}.xml"
+    ov_ir = f"export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
     if onnx_model_fn is None:
         print(f" == Start to load {ov_ir}")
         model = core.read_model(ov_ir)
@@ -52,7 +53,7 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', shape_mode='static
         
         print(f"** infer {id} ")
         out = compiled_model({"input": input})
-        outputs.append(out["output"].tolist())
+        outputs.append(copy.deepcopy(out["output"].tolist()))
     return outputs
 
 class MyAddPyOP(torch.autograd.Function):
@@ -68,6 +69,7 @@ class MyAddPyOP(torch.autograd.Function):
     @staticmethod
     def forward(self, x, bias):
         y = x + bias
+        # print("bias=", bias, y[0][0][0:3])
         return y
     
 class MyPytorchModel(nn.Module):
@@ -82,37 +84,40 @@ class MyPytorchModel(nn.Module):
         self.my_add_py_op = MyAddPyOP
 
     def forward(self, x):
-        print(f" == MyPytorchModel::forward, input shape: {x.shape}")
+        print(f" == MyPytorchModel::forward, input shape: {x.shape}, x[:3]={x[0][0][:3]}")
         r1 = self.norm(x.contiguous(), self.normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
         r2 = self.my_add_py_op.apply(r1, self.last_bias)
         return r2
 
-def main(device, shape_mode):
-    print(f"== Start to test custom op with device='{device}', shape_mode='{shape_mode}'")
+def main(device, dynamic_shape):
+    print(f"== Start to test custom op with device='{device}', dynamic_shape='{dynamic_shape}'")
 
     # Original model(pytorch model)
     model_pt = MyPytorchModel(0.1)
 
     batch, sentence_length, embedding_dim = 20, 5, 10
-    inp0 = cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d_0.pt", dtype=torch.float32)
-    inp1 = cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1.pt", dtype=torch.float32)
-    inp1_1 = cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1_1.pt", dtype=torch.float32)
-    inp2 = cache_randn_3d(2, sentence_length, embedding_dim, "./tmp/input_3d_2.pt", dtype=torch.float32)
+    inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d_0.pt", dtype=torch.float32),
+              cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1.pt", dtype=torch.float32),
+              cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1_1.pt", dtype=torch.float32),
+              cache_randn_3d(2, sentence_length, embedding_dim, "./tmp/input_3d_2.pt", dtype=torch.float32)
+    ]
+    if not dynamic_shape:
+        inputs = inputs[:1]
 
     model_pt.eval()
     
-    onnx_model_fn = f'my_model_{device}_{shape_mode}.onnx'
+    onnx_model_fn = f'my_model_{device}_{dynamic_shape}.onnx'
     
     DirectCallOV = True
-    DirectCallOV = False
+    # DirectCallOV = False
     if not DirectCallOV:
         # Export ONNX
         input_names = ["input"]
         output_names = ["output"]
 
-        if shape_mode == 'static':
+        if dynamic_shape == 'static':
             with torch.no_grad():
-                torch.onnx.export(model_pt, inp0, onnx_model_fn,
+                torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
                                 input_names=input_names,
                                 output_names=output_names,
                                 operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
@@ -122,44 +127,51 @@ def main(device, shape_mode):
                 "output": {0: "batch"} # 0 is the index of the batch dimension
             }
             with torch.no_grad():
-                torch.onnx.export(model_pt, inp0, onnx_model_fn,
+                torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
                                 input_names=input_names,
                                 output_names=output_names,
                                 dynamic_axes=dynamic_axes,
                                 operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
 
     print(f"== Start to run torch model.")
-    ref0 = model_pt(inp0)
-    ref1 = model_pt(inp1)
-    ref1_1 = model_pt(inp1_1)
-    ref2 = model_pt(inp2)
+    outp_refs = []
+    for inp in inputs:
+        ref = copy.deepcopy(model_pt(inp))
+        outp_refs.append(ref)
 
-    rslts_ov = run_ov_model([inp0, inp1, ref1_1, inp2], None if DirectCallOV else onnx_model_fn, device, shape_mode)
-    rslts_ov = [torch.tensor(rslt_ov) for rslt_ov in rslts_ov]
-    print("== ref  =", ref0[0][0][:3])
-    print("== rslt_ov=", rslts_ov[0][0][0][:3])
+    outps_ov = run_ov_model(inputs, None if DirectCallOV else onnx_model_fn, device, dynamic_shape)
+    outps_ov = [torch.tensor(rslt_ov) for rslt_ov in outps_ov]
+
+    for idx, inp in enumerate(inputs):
+        print(f"== input[{idx}] =", inp[0][0][:3])
+
+    for idx, outp in enumerate(outp_refs):
+        print(f"== output_ref[{idx}] =", outp[0][0][:3])
+   
+    for idx, outp in enumerate(outps_ov):
+        print(f"== output_ov[{idx}] =", outp[0][0][:3])
 
     rtol,atol=(1e-3,1e-3) if device == 'GPU' else (1e-5,1e-5)
     if device == 'GPU':
         print("== Warning: Intel GPU default accuracy is fp16, so the accuracy threshold is 1e-3.")
-    print(f"== Compare result with T: {rtol, atol}, Torch VS OV =", 
-          torch.isclose(ref0, rslts_ov[0], rtol, atol).all().numpy(), 
-          torch.isclose(ref1, rslts_ov[1], rtol, atol).all().numpy(),
-          torch.isclose(ref1_1, rslts_ov[2], rtol, atol).all().numpy(),
-          torch.isclose(ref2, rslts_ov[3], rtol, atol).all().numpy())
+    
+    assert(len(outp_refs)==len(outps_ov))
+    for idx in range(len(outps_ov)):
+        print(f"== Compare result with T: {rtol, atol}, Torch VS OV =", 
+              torch.isclose(outp_refs[idx], outps_ov[idx], rtol, atol).all().numpy())
 
 if __name__ == "__main__":
     print("ov version: ", ov.get_version())
     print("pid: ", os.getpid())
 
     # print("*"*30)
-    # main(device='CPU', shape_mode='static')
+    # main(device='CPU', dynamic_shape=False)
 
     # print("*"*30)
-    # main(device='CPU', shape_mode='dynamic')
+    # main(device='CPU', dynamic_shape=True)
 
     # print("*"*30)
-    # main(device='GPU', shape_mode='static')
+    # main(device='GPU', dynamic_shape=False)
     
     # print("*"*30)
-    main(device='GPU', shape_mode='dynamic')
+    main(device='GPU', dynamic_shape=True)
