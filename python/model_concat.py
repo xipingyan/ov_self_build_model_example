@@ -24,7 +24,7 @@ def test_concat():
     m = model(FeaDim=FeaDim)
 
     # Save model
-    # ov.save_model(m, "./tmp_model_gather.xml")
+    ov.save_model(m, "./tmp_model_concat.xml")
 
     compiled_model = core.compile_model(model=m, device_name="CPU")
     ireq = compiled_model.create_infer_request()
