@@ -1,3 +1,5 @@
+# Dependencies:
+# pip install torch onnx
 import openvino as ov
 import numpy as np
 import torch
@@ -96,13 +98,19 @@ def main(device, dynamic_shape):
     model_pt = MyPytorchModel(0.1)
 
     batch, sentence_length, embedding_dim = 20, 5, 10
-    inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_3d_0.pt", dtype=torch.float32),
-              cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1.pt", dtype=torch.float32),
-              cache_randn_3d(10, sentence_length, embedding_dim, "./tmp/input_3d_1_1.pt", dtype=torch.float32),
-              cache_randn_3d(2, sentence_length, embedding_dim, "./tmp/input_3d_2.pt", dtype=torch.float32)
-    ]
+
     if not dynamic_shape:
-        inputs = inputs[:1]
+        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_0.pt", dtype=torch.float32),
+                  cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_1.pt", dtype=torch.float32)]
+    else:
+        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_dyn_3d_0.pt", dtype=torch.float32),
+                  cache_randn_3d(10, sentence_length, embedding_dim,
+                                 "./tmp/input_dyn_3d_1.pt", dtype=torch.float32),
+                  cache_randn_3d(10, sentence_length, embedding_dim,
+                                 "./tmp/input_dyn_3d_1_1.pt", dtype=torch.float32),
+                  cache_randn_3d(2, sentence_length, embedding_dim,
+                                 "./tmp/input_dyn_3d_2.pt", dtype=torch.float32)
+                  ]
 
     model_pt.eval()
     
@@ -171,7 +179,7 @@ if __name__ == "__main__":
     # main(device='CPU', dynamic_shape=True)
 
     # print("*"*30)
-    # main(device='GPU', dynamic_shape=False)
+    main(device='GPU', dynamic_shape=False)
     
     # print("*"*30)
-    main(device='GPU', dynamic_shape=True)
+    # main(device='GPU', dynamic_shape=True)
