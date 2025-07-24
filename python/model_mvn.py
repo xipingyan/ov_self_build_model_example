@@ -81,8 +81,21 @@ def test_mvn(model_type="static"):
 
     # for outp in compiled_model.outputs():
     #     print("  output=", outp)
+
+    if model_type=="dynamic":
+        inputs_dyn = [
+            prepare_input([1,2,4]), 
+            prepare_input([2,2,4]),
+            prepare_input([2,2,4]),
+            prepare_input([3,2,4])
+        ]
+
     print("== Start to infer...")
-    result = irq.infer(input)[compiled_model.output(0)]
+    for i in range(4):
+        print(f"  ** Infer [{i}] model_type = {model_type} ...")
+        if model_type=="dynamic":
+            input = inputs_dyn[i]
+        result = irq.infer(input)[compiled_model.output(0)]
 
     print('===========================================')
     print('== Result shape:', result.shape)
@@ -95,4 +108,4 @@ def test_mvn(model_type="static"):
 
 if __name__ == "__main__":
     test_mvn(model_type='static')
-    test_mvn(model_type="dynamic")
+    # test_mvn(model_type="dynamic")
