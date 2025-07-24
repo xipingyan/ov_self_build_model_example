@@ -1,26 +1,10 @@
-from openvino.runtime import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
-from openvino.runtime.op import util as op_util
+from openvino.runtime import Core, Model, Type, serialize
 from openvino.runtime import opset8 as opset
-from openvino.runtime.passes import Manager
 import openvino.runtime as ov
 import numpy as np
 import os
 
-
-def const(shape):
-    # default generate data with range [0, 1)
-    w = np.random.rand(*shape).astype(np.float32)
-    return op.Constant(w)
-
-
-def value(*shape):
-    return np.random.rand(*shape).astype(np.float32)
-
-
-def new_const_dim(val):
-    return op.Constant(Type.i64, Shape([len(val)]), val)
-
-def model_mvn(input_shape=None):
+def model_mvn(input_shape):
     input = opset.parameter(input_shape, Type.f32, name='input0')
 
     axes_node = opset.constant([2], dtype=ov.Type.i64, name="mvn_axes")
@@ -52,8 +36,8 @@ def test_mvn(model_type="static"):
     print("== OpenVINO Version:", ov.get_version())
     ov_device = os.getenv("OV_DEVICE")
     if ov_device is None:
-        print("== Not set device ENV: OV_DEVICE, default adopt 'CPU'.")
-        ov_device = 'CPU'
+        print("== Not set device ENV: OV_DEVICE, default adopt 'GPU'.")
+        ov_device = 'GPU'
     print("== Test device is: ", ov_device)
 
     run_template = False
