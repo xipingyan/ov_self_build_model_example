@@ -110,7 +110,6 @@ def model_if_multiple_inputs():
     if_op.set_else_body(body_else_function)
 
     if_op.set_input(input1.output(0), input_then_1, input_else_1)
-    if_op.set_input(input1.output(0), input_then_2, input_else_2)
     if_op.set_input(input_for_then_1.output(0), input_then_1, None)
     if_op.set_input(input_for_then_2.output(0), input_then_2, None)
     if_op.set_input(input_for_else_1.output(0), None, input_else_1)
