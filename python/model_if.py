@@ -15,7 +15,7 @@ import os
 #                 |
 # intput2        If     input3
 #    |          /   \      |
-#  then(multiply)  else(multiply)
+#  then(multiply1)  else(multiply2)
 #               \   /
 #                Add
 #                 |
@@ -53,21 +53,26 @@ def model_if():
     res = ov.opset6.result(add, "res")
     return Model(results=[res], parameters=[input1, input_for_then, input_for_else], name='model_if')
 
-def test_model_if(device:str):
-    print(f'ov version:{ov.get_version()}')
+def test_model_if(device:str, then_branch=True):
+    print(f'== test_model_if device = {device}, then_branch = {then_branch}')
     core = Core()
     model = model_if()
     compiled_model = core.compile_model(model=model, device_name=device)
+    
+    input1=np.array([1] if then_branch else [0]).astype(np.float32)
 
-    input1=np.array([1]).astype(np.float32)
     input_for_then=np.array([2]).astype(np.int32)
     input_for_else=np.array([4]).astype(np.int32)
     infer_request = compiled_model.create_infer_request()
 
     print(f"== Run model_if, device={device}")
     result = infer_request.infer([input1, input_for_then, input_for_else])[compiled_model.output(0)]
-    print(f'== reuslt={result}')
+    print(f'== reuslt = {result}, expected = {input_for_then*2 if then_branch else input_for_else*4}')
 
 # == Test ReadValue's input is parameter
-# test_model_if('TEMPLATE')
-test_model_if('CPU')
+if __name__ == "__main__":
+    print(f'ov version:{ov.get_version()}')
+    # test_model_if('TEMPLATE')
+    # test_model_if('CPU')
+    test_model_if('GPU', then_branch=True)
+    test_model_if('GPU', then_branch=False)
