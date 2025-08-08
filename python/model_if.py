@@ -22,16 +22,17 @@ import os
 #               Output
 def model_if():
     input1 = opset.parameter([1], Type.i32, "input1")
-    input_for_then = opset.parameter([1], Type.i32, "input_for_then")
+    input_for_then = opset.parameter([1, 1], Type.i32, "input_for_then")
     input_for_else = opset.parameter([1], Type.i32, "input_for_else")
 
     # equal = ov.opset8.equal(input1.output(0), op.Constant(np.full((1), 2).astype(np.int32)))
     if_op = ov.opset8.if_op()
 
-    input_then = ov.opset8.parameter([1], np.int32, "input_then")
+    input_then = ov.opset8.parameter([1, 1], np.int32, "input_then")
     multiply1 = opset.multiply(input_then, op.Constant(np.full((1), 2).astype(np.int32)))
     multiply1.set_friendly_name("multiply1")
-    then_op_result = ov.opset6.result(multiply1, "res_then")
+    gather = opset.gather(multiply1, 0, 0)
+    then_op_result = ov.opset6.result(gather, "res_then")
     body_then_function = Model(results=[then_op_result], parameters=[input_then], name='model_then_body')
 
     input_else = ov.opset8.parameter([1], np.int32, "input_else")
@@ -61,7 +62,7 @@ def test_model_if(device:str, then_branch=True):
     
     input1=np.array([1] if then_branch else [0]).astype(np.float32)
 
-    input_for_then=np.array([2]).astype(np.int32)
+    input_for_then=np.array([[2]]).astype(np.int32)
     input_for_else=np.array([4]).astype(np.int32)
     infer_request = compiled_model.create_infer_request()
 
@@ -144,8 +145,8 @@ if __name__ == "__main__":
     print(f'ov version:{ov.get_version()}')
     # test_model_if('TEMPLATE')
     # test_model_if('CPU')
-    # test_model_if('GPU', then_branch=True)
-    # test_model_if('GPU', then_branch=False)
-    test_model_if_multiple_inputs('GPU', then_branch=True)
-    test_model_if_multiple_inputs('GPU', then_branch=False)
+    test_model_if('GPU', then_branch=True)
+    test_model_if('GPU', then_branch=False)
+    # test_model_if_multiple_inputs('GPU', then_branch=True)
+    # test_model_if_multiple_inputs('GPU', then_branch=False)
     
