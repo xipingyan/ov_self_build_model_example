@@ -145,8 +145,8 @@ if __name__ == "__main__":
     print(f'ov version:{ov.get_version()}')
     # test_model_if('TEMPLATE')
     # test_model_if('CPU')
-    test_model_if('GPU', then_branch=True)
-    test_model_if('GPU', then_branch=False)
+    # test_model_if('GPU', then_branch=True)
+    # test_model_if('GPU', then_branch=False)
     # test_model_if_multiple_inputs('GPU', then_branch=True)
-    # test_model_if_multiple_inputs('GPU', then_branch=False)
+    test_model_if_multiple_inputs('CPU', then_branch=False)
     

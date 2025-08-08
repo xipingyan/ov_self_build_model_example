@@ -12,14 +12,16 @@ import os
 def new_const_dim(val):
     return op.Constant(Type.i64, Shape([len(val)]), val)
 
-def graph_then_branch(raw_images_1, resize_target_shape, image_mean, image_scale, broadcast_shape):
+def graph_then_branch(if_input, raw_images_1, resize_target_shape, broadcast_shape):
     raw_images_f32_1 = opset.convert(raw_images_1, Type.f32, "then_convert")
     img_trans_1 = opset.transpose(raw_images_f32_1, new_const_dim([0, 3, 1, 2]), "then_transpose")
+
+    image_mean = op.Constant(Type.f32, Shape([1,3,1,1]), [0.1,0.1,0.1])
+    image_scale = op.Constant(Type.f32, Shape([1,3,1,1]), [0.1,0.1,0.1])
 
     attributes = {
         "axes": [2, 3],
         "mode": "cubic",
-        # "pads_begin": np.array([2, 2], dtype=dtype),
         "antialias":True,
         "align_corners":True
     }
@@ -31,17 +33,18 @@ def graph_then_branch(raw_images_1, resize_target_shape, image_mean, image_scale
     temporal_images = opset.broadcast(resized_images_s_1, broadcast_shape, name="then_broadcase")
 
     results = ov.opset6.result(temporal_images, "then_res")
-    submodel = Model(results=[results], parameters=[raw_images_1,
+    submodel = Model(results=[results], parameters=[if_input, raw_images_1,
                                                     resize_target_shape,
-                                                    image_mean,
-                                                    image_scale,
                                                     broadcast_shape], name='then_body')
     return submodel, results
 
-def graph_else_branch(raw_images_1, raw_images_2, resize_target_shape, image_mean, image_scale):
+def graph_else_branch(else_same_image, raw_images_1, raw_images_2, resize_target_shape):
     raw_images_f32_1 = opset.convert(raw_images_1, Type.f32, name="else_convert1")
     raw_images_f32_2 = opset.convert(raw_images_2, Type.f32, name="else_convert2")
     
+    image_mean = op.Constant(Type.f32, Shape([1,3,1,1]), [0.1,0.1,0.1])
+    image_scale = op.Constant(Type.f32, Shape([1,3,1,1]), [0.1,0.1,0.1])
+
     img_trans_1 = opset.transpose(raw_images_f32_1, new_const_dim([0, 3, 1, 2]), name="else_transpose1")
     img_trans_2 = opset.transpose(raw_images_f32_2, new_const_dim([0, 3, 1, 2]), name="else_transpose2")
     attributes = {
@@ -59,78 +62,92 @@ def graph_else_branch(raw_images_1, raw_images_2, resize_target_shape, image_mea
     resized_images_f32_planar_1 = opset.clamp(img_resized_rnd_1, 0, 255, name="else_clamp1")
     resized_images_f32_planar_2 = opset.clamp(img_resized_rnd_2, 0, 255, name="else_clamp2")
     resized_images_m_1 = opset.subtract(resized_images_f32_planar_1, image_mean)
+    resized_images_m_1 = opset.subtract(resized_images_m_1, else_same_image)
     resized_images_m_2 = opset.subtract(resized_images_f32_planar_2, image_mean)
     resized_images_s_1 = opset.multiply(resized_images_m_1, image_scale)
     resized_images_s_2 = opset.multiply(resized_images_m_2, image_scale)
     temporal_images = opset.concat([resized_images_s_1, resized_images_s_2], axis=0, name="my_concat")
 
     results = ov.opset6.result(temporal_images, "res")
-    submodel = Model(results=[results], parameters=[raw_images_1,
+    submodel = Model(results=[results], parameters=[else_same_image, raw_images_1,
                                                     raw_images_2,
-                                                    resize_target_shape,
-                                                    image_mean,
-                                                    image_scale], name='else_body')
+                                                    resize_target_shape], name='else_body')
     return submodel, results
 
 def model_if_complex():
-    same_image = opset.parameter([], Type.f32, "same_image")
+    same_image = opset.parameter([1], Type.f32, "same_image")
 
     raw_images_1 = opset.parameter([-1, -1, -1, -1], Type.u8, "raw_images_1")
     raw_images_2 = opset.parameter([-1, -1, -1, -1], Type.u8, "raw_images_2")
     resize_target_shape = opset.parameter([2], Type.i64, "resize_target_shape")
-    image_mean = opset.parameter([1, -1, 1, 1], Type.f32, "image_mean")
-    image_scale = opset.parameter([1, -1, 1, 1], Type.f32, "image_scale")
     broadcast_shape = opset.parameter([4], Type.i64, "broadcast_shape")
 
-    then_raw_images_1 = opset.parameter([-1, -1, -1, -1], Type.u8)
-    then_raw_images_2 = opset.parameter([-1, -1, -1, -1], Type.u8)
-    then_resize_target_shape = opset.parameter([2], Type.i64)
-    then_image_mean = opset.parameter([1, -1, 1, 1], Type.f32)
-    then_image_scale = opset.parameter([1, -1, 1, 1], Type.f32)
-    then_broadcast_shape = opset.parameter([4], Type.i64)
-    model_then, output_then = graph_then_branch(then_raw_images_1,
+    then_same_image = opset.parameter([1], Type.f32, "then_same_image")
+    then_raw_images_1 = opset.parameter([-1, -1, -1, -1], Type.u8, name="then_inp_1")
+    then_resize_target_shape = opset.parameter([2], Type.i64, name="then_inp_3")
+    then_broadcast_shape = opset.parameter([4], Type.i64, name="then_inp_6")
+
+    model_then, output_then = graph_then_branch(then_same_image, then_raw_images_1,
                                     then_resize_target_shape,
-                                    then_image_mean,
-                                    then_image_scale,
                                     then_broadcast_shape)
     
+    else_same_image = opset.parameter([1], Type.f32, "else_same_image")
     else_raw_images_1 = opset.parameter([-1, -1, -1, -1], Type.u8)
     else_raw_images_2 = opset.parameter([-1, -1, -1, -1], Type.u8)
     else_resize_target_shape = opset.parameter([2], Type.i64)
-    else_image_mean = opset.parameter([1, -1, 1, 1], Type.f32)
-    else_image_scale = opset.parameter([1, -1, 1, 1], Type.f32)
-    model_else, output_else = graph_else_branch(else_raw_images_1,
+    model_else, output_else = graph_else_branch(else_same_image, else_raw_images_1,
                                    else_raw_images_2,
-                                   else_resize_target_shape,
-                                   else_image_mean,
-                                   else_image_scale)
+                                   else_resize_target_shape)
 
     if_op = ov.opset8.if_op()
     if_op.set_then_body(model_then)
     if_op.set_else_body(model_else)
 
-    if_op.set_input(same_image.output(0), then_raw_images_1, else_raw_images_1)
+    # Note: "IF"节点，第一个参数，判断条件必须参与计算，否则可能无法被注册。无法理解其行为。 
+    if_op.set_input(same_image.output(0), then_same_image, else_same_image)
 
     if_op.set_input(raw_images_1.output(0), None, else_raw_images_1)
     if_op.set_input(raw_images_2.output(0), None, else_raw_images_2)
     if_op.set_input(resize_target_shape.output(0), None, else_resize_target_shape)
-    if_op.set_input(image_mean.output(0), None, else_image_mean)
-    if_op.set_input(image_scale.output(0), None, else_image_scale)
     
     if_op.set_input(raw_images_1.output(0), then_raw_images_1, None)
-    if_op.set_input(raw_images_2.output(0), then_raw_images_2, None)
     if_op.set_input(resize_target_shape.output(0), then_resize_target_shape, None)
-    if_op.set_input(image_mean.output(0), then_image_mean, None)
-    if_op.set_input(image_scale.output(0), then_image_scale, None)
     if_op.set_input(broadcast_shape.output(0), then_broadcast_shape, None)
 
     result_if = if_op.set_output(output_then, output_else)
 
-    add = opset.add(result_if, op.Constant(np.full((1), 0).astype(np.int32)))
-    res = ov.opset6.result(add, "res")
+    # add = opset.add(result_if, op.Constant(np.full((1), 0).astype(np.float32)))
+    res = ov.opset6.result(result_if, "res")
 
-    return Model(results=[res], parameters=[same_image, raw_images_1, raw_images_2, resize_target_shape, image_mean, image_scale], name='model_if')
+    return Model(results=[res], parameters=[same_image, raw_images_1, raw_images_2, resize_target_shape, broadcast_shape], name='model_if')
 
+def test_then_branch(device:str):
+    print(f'== test_then_branch: device = {device}')
+    core = Core()
+
+    then_same_image = opset.parameter([1], Type.f32)
+    then_raw_images_1 = opset.parameter([-1, -1, -1, -1], Type.u8, name="then_inp_1")
+    then_resize_target_shape = opset.parameter([2], Type.i64, name="then_inp_3")
+    then_broadcast_shape = opset.parameter([4], Type.i64, name="then_inp_6")
+
+    model, outputs = graph_then_branch(then_same_image, then_raw_images_1,
+                                    then_resize_target_shape,
+                                    then_broadcast_shape)
+
+    compiled_model = core.compile_model(model=model, device_name=device)
+    
+    same_image=np.array([1]).astype(np.float32)
+    raw_images_1 = (np.random.randn(1, 128, 128, 3)*20).astype(np.uint8)
+    resize_target_shape = np.array([140, 140]).astype(np.int64)
+    broadcast_shape = np.array([2, 3, 140, 140]).astype(np.int64)
+
+    infer_request = compiled_model.create_infer_request()
+
+    print(f"== Run model_if, device={device}")
+    result = infer_request.infer([same_image, raw_images_1, 
+                                  resize_target_shape,
+                                  broadcast_shape])[compiled_model.output(0)]
+    print(f'== reuslt = {result.shape}')
 
 def test_model_if_complex(device:str, then_branch=True):
     print(f'== test_model_if_complex device = {device}, then_branch = {then_branch}')
@@ -139,21 +156,22 @@ def test_model_if_complex(device:str, then_branch=True):
     compiled_model = core.compile_model(model=model, device_name=device)
     
     same_image=np.array([1] if then_branch else [0]).astype(np.float32)
-    raw_images_1 = (np.random.randn(1, 3, 128, 128)*20).astype(np.uint8)
-    raw_images_2 = (np.random.randn(1, 3, 128, 128)*20).astype(np.uint8)
+    raw_images_1 = (np.random.randn(1, 128, 128, 3)*20).astype(np.uint8)
+    raw_images_2 = (np.random.randn(1, 128, 128, 3)*20).astype(np.uint8)
     resize_target_shape = np.array([140, 140]).astype(np.int64)
-    image_mean = np.array([[[[0.1]],[[0.1]],[[0.1]]]]).astype(np.float32)
-    image_scale = np.array([[[[0.1]],[[0.1]],[[0.1]]]]).astype(np.float32)
     broadcast_shape = np.array([2, 3, 140, 140]).astype(np.int64)
 
     infer_request = compiled_model.create_infer_request()
 
     print(f"== Run model_if, device={device}")
-    result = infer_request.infer([same_image, raw_images_1, raw_images_2, resize_target_shape, image_mean, image_scale, broadcast_shape])[compiled_model.output(0)]
+    result = infer_request.infer([same_image, raw_images_1, raw_images_2, 
+                                  resize_target_shape,
+                                  broadcast_shape])[compiled_model.output(0)]
     print(f'== reuslt = {result.shape}')
 
 if __name__ == "__main__":
     print(f'ov version:{ov.get_version()}')
     test_model_if_complex('GPU', then_branch=True)
     test_model_if_complex('GPU', then_branch=False)
+    # test_then_branch("CPU") # pass
     
