@@ -6,7 +6,7 @@ from openvino.runtime.op import util as op_util
 from openvino.runtime import opset8 as opset
 from openvino.runtime.passes import Manager
 import numpy as np
-import time
+from utils.random_input import generate_random_array
 import os
 
 def new_const_dim(val):
@@ -156,18 +156,24 @@ def test_model_if_complex(device:str, then_branch=True):
     compiled_model = core.compile_model(model=model, device_name=device)
     
     same_image=np.array([1] if then_branch else [0]).astype(np.float32)
-    raw_images_1 = (np.random.randn(1, 128, 128, 3)*20).astype(np.uint8)
-    raw_images_2 = (np.random.randn(1, 128, 128, 3)*20).astype(np.uint8)
     resize_target_shape = np.array([140, 140]).astype(np.int64)
     broadcast_shape = np.array([2, 3, 140, 140]).astype(np.int64)
 
     infer_request = compiled_model.create_infer_request()
 
-    print(f"== Run model_if, device={device}")
-    result = infer_request.infer([same_image, raw_images_1, raw_images_2, 
-                                  resize_target_shape,
-                                  broadcast_shape])[compiled_model.output(0)]
-    print(f'== reuslt = {result.shape}')
+    for i in range(3):
+        print(f"== Run model_if, device={device}, i = {i}")
+        raw_images_1 = generate_random_array(1, 128, 128, 3, type=np.uint8, cache_prefix=f"tmp_img_1_{i}")
+        raw_images_2 = generate_random_array(1, 128, 128, 3, type=np.uint8, cache_prefix=f"tmp_img_2_{i}")
+
+        result = infer_request.infer([same_image, raw_images_1, raw_images_2, 
+                                    resize_target_shape,
+                                    broadcast_shape])[compiled_model.output(0)]
+        output_fn=f"resutl_{i}.npy"
+        if not os.path.exists(output_fn):
+            np.save(output_fn, result)
+        old_output = np.load(output_fn)
+        print(f'== reuslt = {result.shape}, old vs new: {np.isclose(result, old_output, rtol=0.001, atol=0.001).all()}')
 
 if __name__ == "__main__":
     print(f'ov version:{ov.get_version()}')

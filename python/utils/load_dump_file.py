@@ -1,5 +1,6 @@
 import numpy as np
 
+# load openvino GPU dump's input/output data.
 def load_dump_file(fn:str, new_shape=None, shape_dim=1):
     # Read file
     with open(fn, "r") as file:
