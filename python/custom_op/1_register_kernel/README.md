@@ -35,3 +35,16 @@ Refer: https://docs.openvino.ai/2025/documentation/openvino-extensibility/custom
     
     -c: gpu custom op kernel.
     -extensions: cpu kernel implementation.
+
+#### 2 Custom OP
+
+```
+./test_2_custom_op.sh
+```
+
+#### Custom OP with 2 output
+
+```
+./run_custom_op_2_outputs.sh
+```
+

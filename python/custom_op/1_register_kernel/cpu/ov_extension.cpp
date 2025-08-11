@@ -4,6 +4,7 @@
 
 #include "custom_add.hpp"
 #include "custom_eltwise.hpp"
+#include "custom_add_2_output.hpp"
 
 OPENVINO_CREATE_EXTENSIONS(
     std::vector<ov::Extension::Ptr>({
@@ -13,4 +14,7 @@ OPENVINO_CREATE_EXTENSIONS(
 
         std::make_shared<ov::OpExtension<TemplateExtension::MyEltwise>>(),
         std::make_shared<ov::frontend::OpExtension<TemplateExtension::MyEltwise>>(),
+
+        std::make_shared<ov::OpExtension<TemplateExtension::MyAdd2Output>>(),
+        std::make_shared<ov::frontend::OpExtension<TemplateExtension::MyAdd2Output>>(),
     }));

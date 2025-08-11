@@ -2,7 +2,8 @@ source ../../python-env/bin/activate
 # source /mnt/xiping/mygithub/openvino/build/install/setupvars.sh
 source /mnt/xiping/openvino/build/install/setupvars.sh
 
-onetrace --chrome-call-logging --chrome-device-timelinepython test_register_custom_op.py
+# onetrace --chrome-call-logging --chrome-device-timeline
+python test_register_custom_op.py
 
 # ROOTPATH=/mnt/xiping/mygithub/ov_self_build_model_example/python/custom_op/1_register_kernel
 # # model=./export_ov_model/openvino_model_GPU_static.xml
