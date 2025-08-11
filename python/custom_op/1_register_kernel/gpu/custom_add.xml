@@ -10,6 +10,7 @@
   <CompilerOptions options="-cl-mad-enable"/>
   <WorkSizes global="B,F,Y"/>
 </CustomLayer>
+
 <CustomLayer name="MyEltwise" type="SimpleGPU" version="1">
   <Kernel entry="custom_eltwise_kernel">
     <Source filename="custom_eltwise.cl"/>
@@ -19,6 +20,21 @@
     <Tensor arg-index="1" type="input" port-index="1" format="BFYX"/>
     <Tensor arg-index="2" type="input" port-index="2" format="BFYX"/>
     <Tensor arg-index="3" type="output" port-index="0" format="BFYX"/>
+  </Buffers>
+  <CompilerOptions options="-cl-mad-enable"/>
+  <WorkSizes global="B,F,Y"/>
+</CustomLayer>
+
+<CustomLayer name="MyAdd2Output" type="SimpleGPU" version="1">
+  <Kernel entry="custom_add_with_2_outputs_kernel">
+    <Source filename="custom_op_with_2_output.cl"/>
+  </Kernel>
+  <Buffers>
+    <Tensor arg-index="0" type="input" port-index="0" format="BFYX"/>
+    <Tensor arg-index="1" type="input" port-index="1" format="BFYX"/>
+    <Tensor arg-index="2" type="input" port-index="2" format="BFYX"/>
+    <Tensor arg-index="3" type="output" port-index="0" format="BFYX"/>
+    <Tensor arg-index="4" type="output" port-index="1" format="BFYX"/>
   </Buffers>
   <CompilerOptions options="-cl-mad-enable"/>
   <WorkSizes global="B,F,Y"/>
