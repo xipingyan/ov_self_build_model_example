@@ -5,7 +5,7 @@ project(${PRJ_NAME})
 
 find_package(OpenVINO REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 # OneTBB
 include_directories(./header/)
