@@ -7,13 +7,15 @@ template <class T>
 inline ov::Tensor initTensor(ov::element::Type type, ov::Shape shp, std::vector<T> inp_data)
 {
     auto tensor = ov::Tensor(type, shp);
-    memcpy(tensor.data<T>(), inp_data.data(), sizeof(T) * inp_data.size());
+    auto size = std::accumulate(shp.begin(), shp.end(), 1);
+    memcpy(tensor.data<T>(), inp_data.data(), sizeof(T) * size);
     return tensor;
 }
 
 inline std::vector<float> randomData(ov::Shape shape)
 {
-    size_t sz = shape.size();
+    size_t sz = std::accumulate(shape.begin(), shape.end(), 1, [](int a, int b)
+                                { return a * b; });
     std::vector<float> rslt(sz);
 
     std::default_random_engine generator;
