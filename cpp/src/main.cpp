@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     // TEST(test_model_conv_bias_sum_reshape());
     // TEST(test_cpu_template_compare());
     // TEST(test_model_stateful());
-    TEST(test_model_if());
+    // TEST(test_model_if());
+    TEST(test_remote_tensor());
     return EXIT_SUCCESS;
 }
