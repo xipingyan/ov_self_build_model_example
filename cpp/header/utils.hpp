@@ -29,3 +29,19 @@ inline std::vector<float> randomData(ov::Shape shape)
     }
     return rslt;
 }
+
+inline std::vector<u_int8_t> randomData_U8(ov::Shape shape)
+{
+    size_t sz = std::accumulate(shape.begin(), shape.end(), 1, [](int a, int b)
+                                { return a * b; });
+    std::vector<u_int8_t> rslt(sz);
+
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (auto i = 0; i < sz; i++)
+    {
+        double random_number = distribution(generator);
+        rslt[i] = static_cast<uint8_t>(random_number * 255);
+    }
+    return rslt;
+}
