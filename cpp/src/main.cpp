@@ -12,6 +12,7 @@ int main(int argc, char **argv)
     // TEST(test_cpu_template_compare());
     // TEST(test_model_stateful());
     // TEST(test_model_if());
-    TEST(test_remote_tensor());
+    TEST(test_model_concat());
+    // TEST(test_remote_tensor());
     return EXIT_SUCCESS;
 }

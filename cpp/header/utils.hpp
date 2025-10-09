@@ -1,13 +1,15 @@
 #pragma once
 
 #include <random>
+#include <assert.h>
 #include <openvino/openvino.hpp>
 
 template <class T>
 inline ov::Tensor initTensor(ov::element::Type type, ov::Shape shp, std::vector<T> inp_data)
 {
     auto tensor = ov::Tensor(type, shp);
-    auto size = std::accumulate(shp.begin(), shp.end(), 1);
+    auto size = tensor.get_size();
+    assert(size == inp_data.size());
     memcpy(tensor.data<T>(), inp_data.data(), sizeof(T) * size);
     return tensor;
 }
