@@ -17,37 +17,40 @@ from openvino import opset8 as opset
 from openvino import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
 
 def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=False):
-    print(" == Start to run OV model.")
+    print("== Start to run OV model.")
     ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
     # ext_path = os.getenv('CUSTOM_OP_LIB')
+    if not os.path.exists(ext_path):
+        print(f"Error: no exist {ext_path}, please follow guide to build CPU extenstion firstly.")
+        exit()
 
     # OV model:
     core = Core()
     core.add_extension(ext_path)
     
-    print(f" == device = '{device}'.")
+    print(f"  == device = '{device}'.")
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    ov_ir = f"export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
+    ov_ir = f"./tmp/export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
     if onnx_model_fn is None:
-        print(f" == Start to load {ov_ir}")
+        print(f"  == Start to load {ov_ir}")
         model = core.read_model(ov_ir)
     else:
-        print(f" == Start to load {onnx_model_fn}")
+        print(f"  == Start to load {onnx_model_fn}")
         model = core.read_model(onnx_model_fn)
 
         if not os.path.exists("export_ov_model"):
             os.mkdir("export_ov_model")
-        print(" == Start to save OpenVINO IR.")
+        print(f"  == Start to save OpenVINO IR: {ov_ir}")
         ov.save_model(model, ov_ir)
 
     compiled_model = core.compile_model(model, device)
 
     if device == 'GPU':
-        print(f" == Release model for gpu plugin to reduce cpu host mem.")
+        print(f"  == Release model for gpu plugin to reduce cpu host mem.")
         model = None
-        print(f" == Release model done.")
+        print(f"  == Release model done.")
 
     outputs = []
     for id, input_pt in enumerate(inputs_pt):
@@ -90,12 +93,15 @@ class MyPytorchModel(nn.Module):
         self.weight_a = cache_randn_1d([10], "./tmp/weight.pt")
         self.bias_a = cache_randn_1d([10], "./tmp/bias.pt")
         self.my_add_py_op = MyAdd2Output
+        self.softmax = F.softmax
 
     def forward(self, x):
-        print(f" == MyPytorchModel::forward, input shape: {x.shape}, x[:3]={x[0][0][:3]}")
+        print(f"  == MyPytorchModel::forward, input shape: {x.shape}, x[:3]={x[0][0][:3]}")
         r1 = self.norm(x.contiguous(), self.normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
         r2,r3 = self.my_add_py_op.apply(r1, self.last_bias1, self.last_bias2)
-        return r2,r3
+        r4 = self.softmax(r2)
+        r5 = self.softmax(r3)
+        return r4,r5
 
 def main(device, dynamic_shape):
     print(f"== Start to test custom op with device='{device}', dynamic_shape='{dynamic_shape}'")
@@ -104,7 +110,7 @@ def main(device, dynamic_shape):
     model_pt = MyPytorchModel(0.1, 0.2)
 
     # Inputs
-    batch, sentence_length, embedding_dim = 20, 5, 10
+    batch, sentence_length, embedding_dim = 4, 5, 10
     if not dynamic_shape:
         inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_0.pt", dtype=torch.float32),
                   cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_1.pt", dtype=torch.float32)]
@@ -148,7 +154,7 @@ def main(device, dynamic_shape):
                                 dynamic_axes=dynamic_axes,
                                 operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
 
-    print(f"== Start to run torch model.")
+    print(f"== Start to run Torch model.")
     outp_refs = []
     for inp in inputs:
         ref = copy.deepcopy(model_pt(inp))
@@ -157,25 +163,23 @@ def main(device, dynamic_shape):
     outps_ov = run_ov_model(inputs, None if DirectCallOV else onnx_model_fn, device, dynamic_shape)
     outps_ov = [[torch.tensor(r) for r in rslt_ov] for rslt_ov in outps_ov]
 
+    print(f"== Compare output:")
     rtol,atol=(1e-3,1e-3) if device == 'GPU' else (1e-5,1e-5)
     assert(len(outp_refs)==len(outps_ov))
     for idx in range(len(outps_ov)):
-        print(f"  == Compare result[{idx}] with T: {rtol, atol}, Torch VS OV =", 
-              torch.isclose(outp_refs[idx][0], outps_ov[idx][0], rtol, atol).all().numpy(), 
-              torch.isclose(outp_refs[idx][1], outps_ov[idx][1], rtol, atol).all().numpy())
+        for out_idx in range(len(outp_refs[idx])):
+            print(f"  ==Torch VS OV: loop idx[{idx}], output_idx[{out_idx}] with T: {rtol, atol}, Torch VS OV =", 
+                torch.isclose(outp_refs[idx][out_idx], outps_ov[idx][out_idx], rtol, atol).all().numpy())
 
 if __name__ == "__main__":
     print("ov version: ", ov.get_version())
     print("pid: ", os.getpid())
 
-    print("*"*30)
-    main(device='CPU', dynamic_shape=False)
-
-    print("*"*30)
-    main(device='CPU', dynamic_shape=True)
-
-    # print("*"*30)
-    # main(device='GPU', dynamic_shape=False)
-    
-    # print("*"*30)
-    # main(device='GPU', dynamic_shape=True)
+    devices_list = ["CPU", "GPU"]
+    dynamic_list = [False, True]
+    # devices_list = ["GPU"]
+    # dynamic_list = [True]
+    for dev in devices_list:
+        for dynamic in dynamic_list:
+            print(f"**** main dev={dev}, dynamic_shape={dynamic} ****")
+            main(device=dev, dynamic_shape=dynamic)
