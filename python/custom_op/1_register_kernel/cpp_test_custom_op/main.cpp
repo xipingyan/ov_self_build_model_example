@@ -35,11 +35,11 @@ void run_inference_example(const std::string& model_path, const std::string& dev
         std::string input_name = input.get_any_name();
         auto input_shape = input.get_partial_shape();
 
-        std::cout << "Model Input Name: " << input_name << ", Shape: " << input_shape << ", Type: " << model->input().get_element_type() << std::endl;
+        std::cout << "  == Model Input Name: " << input_name << ", Shape: " << input_shape << ", Type: " << model->input().get_element_type() << std::endl;
     }
     for (auto output : model->outputs())
     {
-        std::cout << "Model Output Name: " << output.get_any_name() << ", Shape: " << output.get_partial_shape() << ", Type: " << output.get_element_type() << std::endl;
+        std::cout << "  == Model Output Name: " << output.get_any_name() << ", Shape: " << output.get_partial_shape() << ", Type: " << output.get_element_type() << std::endl;
     }
 
     // --------------------------- 4. 编译模型 ------------------------------------
@@ -57,10 +57,12 @@ void run_inference_example(const std::string& model_path, const std::string& dev
     for (auto input : model->inputs())
     {        
         std::string input_name = input.get_any_name();
-        ov::Shape input_shape = input.get_shape();
+        auto input_pshape = input.get_partial_shape();
         auto data_type = input.get_element_type();
 
         // 假设输入数据是 float32 类型，形状为 [1, C, H, W]
+        ov::Shape input_shape = ov::Shape({BATCH_SIZE, input_pshape.get_max_shape()[1], input_pshape.get_max_shape()[2]});
+        std::cout << "  == input_shape = " << input_shape << std::endl;
         size_t total_input_size = std::accumulate(input_shape.begin(), input_shape.end(), (size_t)1, std::multiplies<size_t>());
         std::vector<float> input_data(total_input_size);
         std::iota(input_data.begin(), input_data.end(), 0.0f);
@@ -99,7 +101,9 @@ void run_inference_example(const std::string& model_path, const std::string& dev
 int main(int argc, char* argv[]) {
     try {
         std::string model_path = "/mnt/xiping/gpu_profiling/ov_self_build_model_example/python/custom_op/1_register_kernel/tmp/export_ov_model/openvino_model_CPU_True.xml";
+        model_path = "/mnt/xiping/gpu_profiling/ov_self_build_model_example/python/custom_op/1_register_kernel/tmp/export_ov_model/openvino_model_GPU_True.xml";
         std::string device_name = "GPU";
+        device_name = "CPU";
 
         run_inference_example(model_path, device_name);
 

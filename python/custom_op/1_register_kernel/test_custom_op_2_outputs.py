@@ -177,8 +177,8 @@ if __name__ == "__main__":
 
     devices_list = ["CPU", "GPU"]
     dynamic_list = [False, True]
-    # devices_list = ["GPU"]
-    # dynamic_list = [True]
+    devices_list = ["GPU"]
+    dynamic_list = [True]
     for dev in devices_list:
         for dynamic in dynamic_list:
             print(f"**** main dev={dev}, dynamic_shape={dynamic} ****")
