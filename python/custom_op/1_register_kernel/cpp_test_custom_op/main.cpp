@@ -43,7 +43,6 @@ void run_inference_example(const std::string& model_path, const std::string& dev
     }
 
     // --------------------------- 4. 编译模型 ------------------------------------
-    // 将模型编译到指定的设备上 (CPU, GPU, MYRIAD 等)
     CompiledModel compiled_model = core.compile_model(model, device_name);
     std::cout << "Model compiled for device: " << device_name << std::endl;
 
@@ -104,20 +103,19 @@ void run_inference_example(const std::string& model_path, const std::string& dev
 }
 
 int main(int argc, char* argv[]) {
-    try {
-        std::string model_path = "/mnt/xiping/gpu_profiling/ov_self_build_model_example/python/custom_op/1_register_kernel/tmp/export_ov_model/openvino_model_CPU_True.xml";
-        model_path = "/mnt/xiping/gpu_profiling/ov_self_build_model_example/python/custom_op/1_register_kernel/tmp/export_ov_model/openvino_model_GPU_True.xml";
-        std::string device_name = "GPU";
-        device_name = "CPU";
-
-        run_inference_example(model_path, device_name);
-
-    } catch (const std::exception& ex) {
-        std::cerr << "An error occurred: " << ex.what() << std::endl;
-        return 1;
-    } catch (...) {
-        std::cerr << "An unknown error occurred." << std::endl;
-        return 1;
+    std::string device_name = "GPU";
+    if (argc == 2) {
+        device_name = argv[1];
     }
+    else {
+        std::cout << "$ app [dev name] " << std::endl;
+    }
+    std::cout << "== Device = " << device_name << std::endl;
+
+    std::string workpath = "/mnt/xiping/mygithub/ov_self_build_model_example/python/custom_op/1_register_kernel";
+    workpath = "../";
+    std::string model_path = workpath + "/tmp/model_custom_op_2_outputs/export_ov_model/openvino_model_GPU_True.xml";
+
+    run_inference_example(model_path, device_name);
     return 0;
 }

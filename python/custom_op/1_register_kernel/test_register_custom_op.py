@@ -32,7 +32,8 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=Fals
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    ov_ir = f"{TMP_DIR}/export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
+    export_ov_dir=f"{TMP_DIR}/export_ov_model"
+    ov_ir = f"{export_ov_dir}/openvino_model_{device}_{dynamic_shape}.xml"
     if onnx_model_fn is None:
         print(f"  == Start to load {ov_ir}")
         model = core.read_model(ov_ir)
@@ -40,8 +41,8 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=Fals
         print(f"  == Start to load {onnx_model_fn}")
         model = core.read_model(onnx_model_fn)
 
-        if not os.path.exists("export_ov_model"):
-            os.mkdir("export_ov_model")
+        if not os.path.exists(export_ov_dir):
+            os.mkdir(export_ov_dir)
         print(f"  == Start to save OpenVINO IR: {ov_ir}")
         ov.save_model(model, ov_ir)
 
@@ -177,9 +178,6 @@ if __name__ == "__main__":
 
     devices_list = ["CPU", "GPU"]
     dynamic_list = [False, True]
-    devices_list = ["GPU"]
-    devices_list = ["CPU"]
-    dynamic_list = [True]
     for dev in devices_list:
         for dynamic in dynamic_list:
             print(f"**** main dev={dev}, dynamic_shape={dynamic} ****")

@@ -199,14 +199,9 @@ if __name__ == "__main__":
     print("ov version: ", ov.get_version())
     print("pid: ", os.getpid())
 
-    # print("*"*30)
-    # main(device='CPU', dynamic_shape=False)
-
-    # print("*"*30)
-    # main(device='CPU', dynamic_shape=True)
-
-    # print("*"*30)
-    # main(device='GPU', dynamic_shape=False)
-    
-    print("*"*30)
-    main(device='GPU', dynamic_shape=True)
+    devices_list = ["CPU", "GPU"]
+    dynamic_list = [False, True]
+    for dev in devices_list:
+        for dynamic in dynamic_list:
+            print(f"**** main dev={dev}, dynamic_shape={dynamic} ****")
+            main(device=dev, dynamic_shape=dynamic)
