@@ -1,4 +1,6 @@
 build
+openvino
+openvino_toolkit_*
 .vscode
 python-env
 *.pt
