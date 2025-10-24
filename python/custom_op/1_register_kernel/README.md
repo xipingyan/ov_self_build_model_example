@@ -6,7 +6,7 @@ Refer: https://docs.openvino.ai/2025/documentation/openvino-extensibility/custom
 
 1. Build cpp custom kernel(MyAdd)
 
-    cd cpu/ && make build && cd build
+    cd cpu/ && mkdir build && cd build
     source openvino/build/install/setupvars.sh  # Source your self built openvino.
     cmake ..
     make -j20
@@ -17,6 +17,8 @@ Refer: https://docs.openvino.ai/2025/documentation/openvino-extensibility/custom
 2. Run pipeline
 
     source ../../python-env/bin/activate
+    pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+    pip install onnx onnxscript
     python test_register_custom_op.py
     
     <!-- log -->

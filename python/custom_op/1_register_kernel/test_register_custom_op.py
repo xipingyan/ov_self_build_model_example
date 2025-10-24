@@ -29,17 +29,17 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=Fals
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    ov_ir = f"export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
+    ov_ir = f"./tmp/export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
     if onnx_model_fn is None:
-        print(f" == Start to load {ov_ir}")
+        print(f"  == Start to load {ov_ir}")
         model = core.read_model(ov_ir)
     else:
-        print(f" == Start to load {onnx_model_fn}")
+        print(f"  == Start to load {onnx_model_fn}")
         model = core.read_model(onnx_model_fn)
 
         if not os.path.exists("export_ov_model"):
             os.mkdir("export_ov_model")
-        print(" == Start to save OpenVINO IR.")
+        print(f"  == Start to save OpenVINO IR: {ov_ir}")
         ov.save_model(model, ov_ir)
 
     compiled_model = core.compile_model(model, device)
@@ -151,13 +151,13 @@ def main(device, dynamic_shape):
     outps_ov = [torch.tensor(rslt_ov) for rslt_ov in outps_ov]
 
     for idx, inp in enumerate(inputs):
-        print(f"== input[{idx}] =", inp[0][0][:3])
+        print(f"  == input[{idx}] =", inp[0][0][:3])
 
     for idx, outp in enumerate(outp_refs):
-        print(f"== output_ref[{idx}] =", outp[0][0][:3])
+        print(f"  == output_ref[{idx}] =", outp[0][0][:3])
    
     for idx, outp in enumerate(outps_ov):
-        print(f"== output_ov[{idx}] =", outp[0][0][:3])
+        print(f"  == output_ov[{idx}] =", outp[0][0][:3])
 
     rtol,atol=(1e-3,1e-3) if device == 'GPU' else (1e-5,1e-5)
     if device == 'GPU':
@@ -172,14 +172,12 @@ if __name__ == "__main__":
     print("ov version: ", ov.get_version())
     print("pid: ", os.getpid())
 
-    # print("*"*30)
-    # main(device='CPU', dynamic_shape=False)
-
-    # print("*"*30)
-    # main(device='CPU', dynamic_shape=True)
-
-    # print("*"*30)
-    main(device='GPU', dynamic_shape=False)
-    
-    # print("*"*30)
-    # main(device='GPU', dynamic_shape=True)
+    devices_list = ["CPU", "GPU"]
+    dynamic_list = [False, True]
+    devices_list = ["GPU"]
+    devices_list = ["CPU"]
+    dynamic_list = [True]
+    for dev in devices_list:
+        for dynamic in dynamic_list:
+            print(f"**** main dev={dev}, dynamic_shape={dynamic} ****")
+            main(device=dev, dynamic_shape=dynamic)
