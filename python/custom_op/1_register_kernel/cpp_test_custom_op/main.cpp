@@ -65,7 +65,12 @@ void run_inference_example(const std::string& model_path, const std::string& dev
         std::cout << "  == input_shape = " << input_shape << std::endl;
         size_t total_input_size = std::accumulate(input_shape.begin(), input_shape.end(), (size_t)1, std::multiplies<size_t>());
         std::vector<float> input_data(total_input_size);
-        std::iota(input_data.begin(), input_data.end(), 0.0f);
+        // std::iota(input_data.begin(), input_data.end(), 0.0f);
+        for (size_t i = 0; i < input_data.size(); i++)
+        {
+            input_data[i] = (i % 10) / 10.0f;
+        }
+        
 
         // 创建 OpenVINO 张量并绑定数据
         // ov::Tensor 的构造函数可以接受原始数据指针，实现零拷贝

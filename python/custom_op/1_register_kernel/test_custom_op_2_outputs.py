@@ -178,6 +178,7 @@ if __name__ == "__main__":
     devices_list = ["CPU", "GPU"]
     dynamic_list = [False, True]
     devices_list = ["GPU"]
+    devices_list = ["CPU"]
     dynamic_list = [True]
     for dev in devices_list:
         for dynamic in dynamic_list:
