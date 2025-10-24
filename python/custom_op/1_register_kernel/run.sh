@@ -1,6 +1,7 @@
 source ../../python-env/bin/activate
 # source /mnt/xiping/mygithub/openvino/build/install/setupvars.sh
-source /mnt/xiping/openvino/build/install/setupvars.sh
+# source /mnt/xiping/openvino/build/install/setupvars.sh
+source ../../../openvino/build/install/setupvars.sh
 
 # onetrace --chrome-call-logging --chrome-device-timeline
 python test_register_custom_op.py

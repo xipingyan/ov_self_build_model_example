@@ -16,6 +16,9 @@ from utils.comm_pt import cache_randn_1d, cache_randn_3d
 from openvino import opset8 as opset
 from openvino import Core, Model, Tensor, PartialShape, Type, Shape, op, serialize
 
+TMP_DIR='./tmp/model_custom_op_2_outputs'
+os.makedirs(TMP_DIR, exist_ok=True)
+
 def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=False):
     print("== Start to run OV model.")
     ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
@@ -32,7 +35,7 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=Fals
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    ov_ir = f"./tmp/export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
+    ov_ir = f"{TMP_DIR}/export_ov_model/openvino_model_{device}_{dynamic_shape}.xml"
     if onnx_model_fn is None:
         print(f"  == Start to load {ov_ir}")
         model = core.read_model(ov_ir)
@@ -90,8 +93,8 @@ class MyPytorchModel(nn.Module):
         self.norm = F.layer_norm
         self.normalized_shape_a = (10,) # Must be const.
         self.default_eps = 1e-5
-        self.weight_a = cache_randn_1d([10], "./tmp/weight.pt")
-        self.bias_a = cache_randn_1d([10], "./tmp/bias.pt")
+        self.weight_a = cache_randn_1d([10], f"{TMP_DIR}/weight.pt")
+        self.bias_a = cache_randn_1d([10], f"{TMP_DIR}/bias.pt")
         self.my_add_py_op = MyAdd2Output
         self.softmax = F.softmax
 
@@ -112,21 +115,21 @@ def main(device, dynamic_shape):
     # Inputs
     batch, sentence_length, embedding_dim = 4, 5, 10
     if not dynamic_shape:
-        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_0.pt", dtype=torch.float32),
-                  cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_static_3d_1.pt", dtype=torch.float32)]
+        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, f"{TMP_DIR}/input_static_3d_0.pt", dtype=torch.float32),
+                  cache_randn_3d(batch, sentence_length, embedding_dim, f"{TMP_DIR}/input_static_3d_1.pt", dtype=torch.float32)]
     else:
-        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, "./tmp/input_dyn_3d_0.pt", dtype=torch.float32),
+        inputs = [cache_randn_3d(batch, sentence_length, embedding_dim, f"{TMP_DIR}/input_dyn_3d_0.pt", dtype=torch.float32),
                   cache_randn_3d(10, sentence_length, embedding_dim,
-                                 "./tmp/input_dyn_3d_1.pt", dtype=torch.float32),
+                                 f"{TMP_DIR}/input_dyn_3d_1.pt", dtype=torch.float32),
                   cache_randn_3d(10, sentence_length, embedding_dim,
-                                 "./tmp/input_dyn_3d_1_1.pt", dtype=torch.float32),
+                                 f"{TMP_DIR}/input_dyn_3d_1_1.pt", dtype=torch.float32),
                   cache_randn_3d(2, sentence_length, embedding_dim,
-                                 "./tmp/input_dyn_3d_2.pt", dtype=torch.float32)
+                                 f"{TMP_DIR}/input_dyn_3d_2.pt", dtype=torch.float32)
                   ]
 
     model_pt.eval()
     
-    onnx_model_fn = f'my_model_{device}_{dynamic_shape}.onnx'
+    onnx_model_fn = f"{TMP_DIR}/my_model_{device}_{dynamic_shape}.onnx"
     
     DirectCallOV = True
     DirectCallOV = False
@@ -178,7 +181,7 @@ if __name__ == "__main__":
     devices_list = ["CPU", "GPU"]
     dynamic_list = [False, True]
     devices_list = ["GPU"]
-    devices_list = ["CPU"]
+    # devices_list = ["CPU"]
     dynamic_list = [True]
     for dev in devices_list:
         for dynamic in dynamic_list:
