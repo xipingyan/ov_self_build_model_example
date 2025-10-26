@@ -17,7 +17,8 @@ Refer: https://docs.openvino.ai/2025/documentation/openvino-extensibility/custom
 2. Run pipeline
 
     source ../../python-env/bin/activate
-    pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+    <!-- torch2.9 export custom op to onnx, the custom op will be decomposited. -->
+    pip install torch==2.8.0 torchvision-0.23.0+cpu torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
     pip install onnx onnxscript
     python test_register_custom_op.py
     

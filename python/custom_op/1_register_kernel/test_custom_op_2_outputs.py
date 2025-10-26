@@ -19,7 +19,7 @@ from openvino import Core, Model, Tensor, PartialShape, Type, Shape, op, seriali
 TMP_DIR='./tmp/model_custom_op_2_outputs'
 os.makedirs(TMP_DIR, exist_ok=True)
 
-def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=False):
+def run_ov_model(inputs_pt:list, onnx_model_fn, ov_model_fn, device='CPU', dynamic_shape=False):
     print("== Start to run OV model.")
     ext_path = "./cpu/build/libopenvino_custom_add_extension.so"
     # ext_path = os.getenv('CUSTOM_OP_LIB')
@@ -35,19 +35,23 @@ def run_ov_model(inputs_pt:list, onnx_model_fn, device='CPU', dynamic_shape=Fals
     if device == 'GPU':
         core.set_property("GPU", {"CONFIG_FILE": "./gpu/custom_add.xml"})
 
-    export_ov_dir=f"{TMP_DIR}/export_ov_model"
-    ov_ir = f"{export_ov_dir}/openvino_model_{device}_{dynamic_shape}.xml"
-    if onnx_model_fn is None:
-        print(f"  == Start to load {ov_ir}")
-        model = core.read_model(ov_ir)
+    if 0:
+        print(f"  == Start to load {ov_model_fn}")
+        model = core.read_model(ov_model_fn)
     else:
-        print(f"  == Start to load {onnx_model_fn}")
-        model = core.read_model(onnx_model_fn)
+        export_ov_dir=f"{TMP_DIR}/export_ov_model"
+        ov_ir = f"{export_ov_dir}/openvino_model_{device}_{dynamic_shape}.xml"
+        if onnx_model_fn is None:
+            print(f"  == Start to load {ov_ir}")
+            model = core.read_model(ov_ir)
+        else:
+            print(f"  == Start to load {onnx_model_fn}")
+            model = core.read_model(onnx_model_fn)
 
-        if not os.path.exists(export_ov_dir):
-            os.mkdir(export_ov_dir)
-        print(f"  == Start to save OpenVINO IR: {ov_ir}")
-        ov.save_model(model, ov_ir)
+            if not os.path.exists(export_ov_dir):
+                os.mkdir(export_ov_dir)
+            print(f"  == Start to save OpenVINO IR: {ov_ir}")
+            ov.save_model(model, ov_ir)
 
     compiled_model = core.compile_model(model, device)
 
@@ -73,15 +77,23 @@ class MyAdd2Output(torch.autograd.Function):
     # when you want to export your custom PyTorch operation to formats like ONNX 
     @staticmethod
     def symbolic(g, x, bias1, bias2):
+        print("*******************************************, type(z)=", type(x))
         bias1 = torch.tensor(bias1)
         bias1 = g.op("Constant", value_t=bias1)
         bias2 = torch.tensor(bias2)
         bias2 = g.op("Constant", value_t=bias2)
-
-        return g.op('MyAdd2Output', x, bias1, bias2, outputs=2)
+        outputs = g.op('MyAdd2Output', x, bias1, bias2, outputs=2)
+        return outputs[0], outputs[1]
 
     @staticmethod
     def forward(self, x, bias1, bias2):
+        # output1 = torch.Tensor(x.clone())
+        # output2 = torch.Tensor(x.clone())
+        # for d in range(x.shape[0]):
+        #     for y in range(x.shape[1]):
+        #         for z in range(x.shape[2]):
+        #             output1[d][y][z] = x[d][y][z] + bias1
+        #             output2[d][y][z] = x[d][y][z] + bias2
         output1 = x + bias1
         output2 = x + bias2
         return output1, output2
@@ -91,21 +103,48 @@ class MyPytorchModel(nn.Module):
         super(MyPytorchModel, self).__init__()
         self.last_bias1 = last_bias1
         self.last_bias2 = last_bias2
+        self.last_bias1_tensor = torch.tensor(self.last_bias1, dtype=torch.float32)
+        self.last_bias2_tensor = torch.tensor(self.last_bias2, dtype=torch.float32)
         self.norm = F.layer_norm
         self.normalized_shape_a = (10,) # Must be const.
         self.default_eps = 1e-5
         self.weight_a = cache_randn_1d([10], f"{TMP_DIR}/weight.pt")
         self.bias_a = cache_randn_1d([10], f"{TMP_DIR}/bias.pt")
-        self.my_add_py_op = MyAdd2Output
+        # self.my_add_py_op = MyAdd2Output
         self.softmax = F.softmax
 
     def forward(self, x):
         print(f"  == MyPytorchModel::forward, input shape: {x.shape}, x[:3]={x[0][0][:3]}")
         r1 = self.norm(x.contiguous(), self.normalized_shape_a, self.weight_a, self.bias_a, self.default_eps)
-        r2,r3 = self.my_add_py_op.apply(r1, self.last_bias1, self.last_bias2)
+        r2,r3 = MyAdd2Output.apply(r1, self.last_bias1, self.last_bias2)
         r4 = self.softmax(r2)
         r5 = self.softmax(r3)
         return r4,r5
+
+def export_torch_model_to_onnx(model_pt, inputs, onnx_model_fn, is_dynamic_shape):
+    input_names = ["input"]
+    output_names = ["output0", "output1"]
+
+    if not is_dynamic_shape:
+        with torch.no_grad():
+            torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
+                            input_names=input_names,
+                            output_names=output_names,
+                            operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH,
+                            custom_opsets={"com.custom":1})
+    else:
+        dynamic_axes = {
+            "input": {0: "batch"},  # 0 is the index of the batch dimension
+            "output0": {0: "batch"},
+            "output1": {0: "batch"}
+        }
+        with torch.no_grad():
+            torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
+                              input_names=input_names,
+                              output_names=output_names,
+                              dynamic_axes=dynamic_axes,
+                              operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH,
+                              custom_opsets={"com.custom":1})
 
 def main(device, dynamic_shape):
     print(f"== Start to test custom op with device='{device}', dynamic_shape='{dynamic_shape}'")
@@ -131,32 +170,13 @@ def main(device, dynamic_shape):
     model_pt.eval()
     
     onnx_model_fn = f"{TMP_DIR}/my_model_{device}_{dynamic_shape}.onnx"
+    ov_model_fn = f"{TMP_DIR}/my_model_{device}_{dynamic_shape}.xml"
     
     DirectCallOV = True
     DirectCallOV = False
     if not DirectCallOV:
-        # Export ONNX
-        input_names = ["input"]
-        output_names = ["output0", "output1"]
-
-        if dynamic_shape == 'static':
-            with torch.no_grad():
-                torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
-                                input_names=input_names,
-                                output_names=output_names,
-                                operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
-        else:
-            dynamic_axes = {
-                "input": {0: "batch"},  # 0 is the index of the batch dimension
-                "output0": {0: "batch"},
-                "output1": {0: "batch"}
-            }
-            with torch.no_grad():
-                torch.onnx.export(model_pt, inputs[0], onnx_model_fn,
-                                input_names=input_names,
-                                output_names=output_names,
-                                dynamic_axes=dynamic_axes,
-                                operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH)
+        # export_torch_model_to_ov(model_pt=model_pt, dummy_input=inputs[0], OUTPUT_PATH_XML=ov_model_fn)
+        export_torch_model_to_onnx(model_pt=model_pt, inputs=inputs, onnx_model_fn=onnx_model_fn, is_dynamic_shape=dynamic_shape)
 
     print(f"== Start to run Torch model.")
     outp_refs = []
@@ -164,7 +184,7 @@ def main(device, dynamic_shape):
         ref = copy.deepcopy(model_pt(inp))
         outp_refs.append(ref)
 
-    outps_ov = run_ov_model(inputs, None if DirectCallOV else onnx_model_fn, device, dynamic_shape)
+    outps_ov = run_ov_model(inputs, None if DirectCallOV else onnx_model_fn, ov_model_fn, device, dynamic_shape)
     outps_ov = [[torch.tensor(r) for r in rslt_ov] for rslt_ov in outps_ov]
 
     print(f"== Compare output:")
