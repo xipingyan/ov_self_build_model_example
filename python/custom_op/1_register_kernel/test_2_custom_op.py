@@ -1,11 +1,11 @@
-# Dependencies:
-# pip install torch onnx
+# README:
+# Test 2 adjacent comstom op in model.
+
 import openvino as ov
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.autograd import Variable
 import copy
 
 import os
@@ -140,7 +140,7 @@ def main(device, dynamic_shape:bool):
 
     model_pt.eval()
     
-    onnx_model_fn = f"{TMP_DIR}/my_model_2_custom_op_{device}_{dynamic_shape}.onnx'
+    onnx_model_fn = f"{TMP_DIR}/my_model_2_custom_op_{device}_{dynamic_shape}.onnx"
     
     DirectCallOV = True
     DirectCallOV = False
