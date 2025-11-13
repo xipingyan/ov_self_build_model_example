@@ -7,3 +7,4 @@ bool test_model_stateful();
 bool test_model_if();
 bool test_model_concat();
 bool test_remote_tensor();
+bool test_ov_model_with_custom_op();

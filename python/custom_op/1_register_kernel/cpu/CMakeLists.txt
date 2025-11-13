@@ -17,7 +17,7 @@ if(NOT CMAKE_CROSSCOMPILING)
     endif()
 endif()
 
-message(status "${OpenVINO_DIR_PY}")
+message(status "OpenVINO_DIR_PY=${OpenVINO_DIR_PY}")
 find_package(OpenVINO REQUIRED PATHS "${OpenVINO_DIR_PY}")
 
 set(SRC custom_add.cpp ov_extension.cpp custom_eltwise.cpp custom_add_2_output.cpp)
