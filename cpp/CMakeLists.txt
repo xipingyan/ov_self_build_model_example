@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 # OneTBB
 include_directories(./header/)
-file(GLOB SRC "header/*.h" "header/*.hpp" "src/*.cpp")
+file(GLOB SRC "header/*.h" "header/*.hpp" "header/*.cpp" "src/*.cpp")
 
 add_executable(${PRJ_NAME} ${SRC})
 
