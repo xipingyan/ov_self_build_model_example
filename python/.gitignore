@@ -1,3 +1,5 @@
 *.npy
 output_binary
 __pycache__
+merged_model.xml
+merged_model.bin
