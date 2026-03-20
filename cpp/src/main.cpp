@@ -14,6 +14,7 @@ int main(int argc, char **argv)
     // TEST(test_model_if());
     // TEST(test_model_concat());
     // TEST(test_remote_tensor());
-    TEST(test_ov_model_with_custom_op());
+    // TEST(test_ov_model_with_custom_op());
+    TEST(test_merge_2_ov_ir());
     return EXIT_SUCCESS;
 }
