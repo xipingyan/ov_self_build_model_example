@@ -12,6 +12,8 @@ Note: For method 1, there is limitation: no support dynamic shape kernel, becaus
     Official example: https://github.com/openvinotoolkit/openvino_contrib/tree/master/modules/custom_operations
     
 
-# 2: Mapping custom kernel to mulitple OV OPs
+# 2_sample_codec_token_custom_op
+
+Example of sample decode token in TTS.
 
 # 3: ...
