@@ -1,10 +1,11 @@
 #include "private.hpp"
 
 #include <openvino/openvino.hpp>
-#include <openvino/opsets/opset1.hpp>
-#include <openvino/opsets/opset6.hpp>
-#include <openvino/opsets/opset8.hpp>
 #include <openvino/op/slice.hpp>
+#include <openvino/op/concat.hpp>
+#include <openvino/op/matmul.hpp>
+#include <openvino/op/parameter.hpp>
+#include <openvino/op/result.hpp>
 
 // TODO: 
 // 0: For Input1, shape [?, 2].
@@ -26,7 +27,7 @@ std::shared_ptr<ov::Model> draft_model(std::string matmal_name = "mm") {
     auto input1 = std::make_shared<ov::opset1::Parameter>(ov::element::f32, ov::PartialShape{-1, FeaDim});
     auto weights = createConstant<float>(ov::element::f32, ov::Shape{FeaDim, FeaDim}, std::vector<float>({2, 2, 2, 2}));
     auto m = std::make_shared<ov::opset1::MatMul>(input1, weights, false, false);
-    auto result = std::make_shared<ov::opset6::Result>(m);
+    auto result = std::make_shared<ov::opset1::Result>(m);
     auto model = std::make_shared<ov::Model>(ov::ResultVector({result}), ov::ParameterVector({input1}), "model_1");
     return model;
 }
@@ -48,7 +49,7 @@ std::pair<std::shared_ptr<ov::Model>, ov::Output<ov::Node>> merge_2_models(const
     auto stop = createConstant<int64_t>(ov::element::i64, ov::Shape{1}, {std::numeric_limits<int64_t>::max()});
     auto step = createConstant<int64_t>(ov::element::i64, ov::Shape{1}, {1});
     auto axes = createConstant<int64_t>(ov::element::i64, ov::Shape{1}, {0});
-    auto slice_node = std::make_shared<ov::opset8::Slice>(model_1_output, start, stop, step, axes);
+    auto slice_node = std::make_shared<ov::op::v8::Slice>(model_1_output, start, stop, step, axes);
 
     auto concat = std::make_shared<ov::opset1::Concat>(ov::OutputVector{concat_input_1, slice_node->output(0)}, 0);
     model_2_input->output(0).replace(concat->output(0));
