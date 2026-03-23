@@ -91,8 +91,8 @@ def build_model_update_tensor_with_pos_id(const_pos_id, const_update_value):
 def test_update_tensor_with_pos_id():
     core = Core()
 
-    const_pos_id = op.Constant(Type.i64, Shape([2]), [2, 2]) # Update token index per batch.
-    const_update_value = op.Constant(Type.i64, Shape([2]), [3, 4]) # Update value for batch 0 and batch 1.
+    const_pos_id = op.Constant(Type.i64, Shape([3]), [1, 1, 1]) # Update token index per batch.
+    const_update_value = op.Constant(Type.i64, Shape([3]), [3, 4, 5]) # Update value for batch 0 and batch 1.
     m = build_model_update_tensor_with_pos_id(const_pos_id, const_update_value)
 
     # Save model
@@ -101,14 +101,14 @@ def test_update_tensor_with_pos_id():
     compiled_model = core.compile_model(model=m, device_name="CPU")
     ireq = compiled_model.create_infer_request()
 
-    input = np.array([[1, 1, 1, 1], [2, 2, 2, 2]]).astype(np.int64)
+    input = np.array([[1, 1, 1, 1], [2, 2, 2, 2], [2, 2, 2, 2]]).astype(np.int64)
     ireq.set_input_tensor(0, ov.Tensor(input))
     ov_result = ireq.infer()['output']
 
     print("---------------------->")
     print("== input =", input)
     expected = input.copy()
-    expected[:, 2] = [3, 4]
+    expected[:, 1] = [3, 4, 5]
     print("== expected =", expected)
     print("---------------------->")
     print("== ov_result shape =", ov_result.shape)
