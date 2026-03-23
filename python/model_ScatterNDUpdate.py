@@ -63,7 +63,7 @@ def test_scatter_nd_update():
 # For example, input tensor with shape [2, 4] with value [[1, 1, 1, 1], [2, 2, 2, 2]]
 #   If position id [0, 0], update value [3, 4]; -> Result tensor= [[3, 1, 1, 1], [4, 2, 2, 2]]
 #   If position id [2, 2], update value [8, 9]; -> Result tensor= [[1, 1, 8, 1], [2, 2, 9, 2]]
-def build_model_update_tensor_with_pos_id(const_pos_id):
+def build_model_update_tensor_with_pos_id(const_pos_id_scalar):
     # shape=[batch, token_num]
     token_ids = opset8.parameter([-1, -1], Type.i64, name = 'input')
     update_value = opset8.parameter([-1], Type.i64, name = 'input')
@@ -79,7 +79,8 @@ def build_model_update_tensor_with_pos_id(const_pos_id):
     row_idx = opset8.range(start, batch_dim_scalar, step, Type.i64)  # shape=[batch]
     row_idx_2d = opset8.unsqueeze(row_idx, 1)  # shape=[batch,1]
 
-    col_idx = opset8.broadcast(const_pos_id, batch_size)  # shape=[batch]
+    pos_id = op.Constant(Type.i64, Shape([]), [const_pos_id_scalar]) # shape=[], value=[pos_id]
+    col_idx = opset8.broadcast(pos_id, batch_size)  # shape=[batch]
     col_idx_2d = opset8.unsqueeze(col_idx, 1)  # shape=[batch,1]
 
     indices = opset8.concat([row_idx_2d, col_idx_2d], 1)  # shape=[batch,2]
@@ -92,8 +93,8 @@ def build_model_update_tensor_with_pos_id(const_pos_id):
 def test_update_tensor_with_pos_id():
     core = Core()
 
-    const_pos_id = op.Constant(Type.i64, Shape([3]), [1, 1, 1]) # Update token index per batch.
-    m = build_model_update_tensor_with_pos_id(const_pos_id)
+    const_pos_id_scalar = 1
+    m = build_model_update_tensor_with_pos_id(const_pos_id_scalar)
 
     # Save model
     # ov.save_model(m, "./tmp_model_scatter_nd_update.xml")
