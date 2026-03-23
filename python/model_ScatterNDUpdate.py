@@ -63,9 +63,10 @@ def test_scatter_nd_update():
 # For example, input tensor with shape [2, 4] with value [[1, 1, 1, 1], [2, 2, 2, 2]]
 #   If position id [0, 0], update value [3, 4]; -> Result tensor= [[3, 1, 1, 1], [4, 2, 2, 2]]
 #   If position id [2, 2], update value [8, 9]; -> Result tensor= [[1, 1, 8, 1], [2, 2, 9, 2]]
-def build_model_update_tensor_with_pos_id(const_pos_id, const_update_value):
+def build_model_update_tensor_with_pos_id(const_pos_id):
     # shape=[batch, token_num]
     token_ids = opset8.parameter([-1, -1], Type.i64, name = 'input')
+    update_value = opset8.parameter([-1], Type.i64, name = 'input')
 
     # Build indices for scatter_nd_update based on pos_id.
     token_ids_shape = opset8.shape_of(token_ids)
@@ -82,18 +83,17 @@ def build_model_update_tensor_with_pos_id(const_pos_id, const_update_value):
     col_idx_2d = opset8.unsqueeze(col_idx, 1)  # shape=[batch,1]
 
     indices = opset8.concat([row_idx_2d, col_idx_2d], 1)  # shape=[batch,2]
-    updates = opset8.broadcast(const_update_value, batch_size) # shape=[batch], value per batch
+    updates = opset8.broadcast(update_value, batch_size) # shape=[batch], value per batch
 
     scatter_nd_update_node = opset8.scatter_nd_update(token_ids, indices, updates, name="scatter_nd_update") # shape=[batch, token_num]
  
     Result = opset8.result(scatter_nd_update_node.output(0), name='output')
-    return Model([Result], [token_ids], 'model_scatter_nd_update_pos_id')
+    return Model([Result], [token_ids, update_value], 'model_scatter_nd_update_pos_id')
 def test_update_tensor_with_pos_id():
     core = Core()
 
     const_pos_id = op.Constant(Type.i64, Shape([3]), [1, 1, 1]) # Update token index per batch.
-    const_update_value = op.Constant(Type.i64, Shape([3]), [3, 4, 5]) # Update value for batch 0 and batch 1.
-    m = build_model_update_tensor_with_pos_id(const_pos_id, const_update_value)
+    m = build_model_update_tensor_with_pos_id(const_pos_id)
 
     # Save model
     # ov.save_model(m, "./tmp_model_scatter_nd_update.xml")
@@ -102,7 +102,10 @@ def test_update_tensor_with_pos_id():
     ireq = compiled_model.create_infer_request()
 
     input = np.array([[1, 1, 1, 1], [2, 2, 2, 2], [2, 2, 2, 2]]).astype(np.int64)
+    update_value = np.array([3, 4, 5]).astype(np.int64)
+
     ireq.set_input_tensor(0, ov.Tensor(input))
+    ireq.set_input_tensor(1, ov.Tensor(update_value))
     ov_result = ireq.infer()['output']
 
     print("---------------------->")
