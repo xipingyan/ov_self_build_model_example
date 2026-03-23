@@ -44,5 +44,27 @@ def test_concat():
     print("== result.shape=", ov_result.shape)
     print("== OV result =\n", ov_result)
 
+# Test concat to build a tensor
+# Input: batch_dim and fea_dim.
+# Output: tensor with shape=[2, 1], data=[[batch_dim], [fea_dim]]
+def test_concat_build_a_tensor():
+    batch_dim = opset.parameter([-1], Type.i32, name = 'batch_dim')
+    fea_dim = opset.parameter([-1], Type.i32, name = 'fea_dim')
+    batch_dim_1d = opset.unsqueeze(batch_dim, 0)    # ->shape [1, 1]
+    fea_dim_1d = opset.unsqueeze(fea_dim, 0)        # ->shape [1, 1]
+    concat = opset.concat([batch_dim_1d, fea_dim_1d], 0) # ->shape [2, 1]
+    Result = opset.result(concat, name='output')
+    m = Model([Result], [batch_dim, fea_dim], 'model_concat_2')
+
+    core = Core()
+    compiled_model = core.compile_model(model=m, device_name="CPU")
+    ireq = compiled_model.create_infer_request()
+    batch_dim = np.array([2], dtype=np.int32)
+    fea_dim = np.array([4], dtype=np.int32)
+    ov_result = ireq.infer([batch_dim, fea_dim])['output']
+    print("== ov_result shape =\n", ov_result.shape)
+    print("== ov_result data =\n", ov_result.tolist())
+
 if __name__ == "__main__":
-    test_concat()
+    # test_concat()
+    test_concat_build_a_tensor()
