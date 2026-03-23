@@ -9,17 +9,14 @@ def new_const_1_dim(val):
     return op.Constant(Type.i32, Shape([1]), [val])
 
 def model(FeaDim):
-    # shape=[batch, fea]
-    logits = opset.parameter([-1, FeaDim], Type.f32, name = 'input')
+    # shape=[batch, sequence, fea]
+    logits = opset.parameter([-1, -1, FeaDim], Type.f32, name = 'input')
 
-    # TopK on axis 0: topk=1, axis=0, mode='max', sort='none'
-    topk = 1
-    axis = 1
-    mode = 'max'
-    sort = 'none'
-    name = "topk"
-    topk_node = opset.topk(logits, topk, axis, mode, sort, name=name)
- 
+    # Get axis=1's last tensor, shape=[batch, fea]
+    gather = opset.gather(logits, -1, 1, name="sequence")  # shape=[batch, fea]
+
+    topk_node = opset.topk(gather, 1, 1, 'max', 'none', name="topk")
+
     # TopK has two outputs: values (0) and indices (1)
     Result = opset.result(topk_node.output(1), name='output')
     return Model([Result], [logits], 'model_topk')
@@ -35,23 +32,21 @@ def test_topk():
     compiled_model = core.compile_model(model=m, device_name="CPU")
     ireq = compiled_model.create_infer_request()
 
-    # input.shape = [2, FeaDim]
-    input = np.array([[1, 2, 3, 4], [5, 6, 8, 7]]).astype(np.float32)
+    # input.shape = [2, 1, FeaDim]
+    input = np.array([[[1, 2, 3, 4], [21, 88, 23, 24]], [[5, 6, 8, 7], [99, 26, 28, 27]]]).astype(np.float32)
     assert(FeaDim == input.shape[-1])
     
-    print("== input.shape=", input.shape)
-    # Expected result, max value's indices on axis 1: [[3], [2]]
-    # input.max(axis=1, keepdims=True) = [[4], [8]]
-    # input.argmax(axis=1, keepdims=True) = [[3], [2]]   // Get the indices.
-    expected_max_value = input.max(axis=1, keepdims=True)
-    expected_max_value_indices = input.argmax(axis=1, keepdims=True)
-    print("== Expected result = input.max(axis=1, keepdims=True) =\n", expected_max_value)
-    print("== Expected result = input.argmax(axis=1, keepdims=True) =\n", expected_max_value_indices)
+    print("== input.shape =", input.shape)
+    expected_max_value = input[:, -1, :].max(axis=1, keepdims=True)
+    expected_max_value_indices = input[:, -1, :].argmax(axis=1, keepdims=True)
+    print("== expected_max_value =\n", expected_max_value)
+    print("== expected_max_value_indices =\n", expected_max_value_indices)
 
     # OV result
     ov_result = ireq.infer(input)['output']
     print("---------------------->")
-    print("== OV result =\n", ov_result)
+    print("== ov_result shape =", ov_result.shape)
+    print("== ov_result =", ov_result)
 
     print("== Expected vs OV result:", (expected_max_value_indices - ov_result.tolist() < 0.0001).all())
 
