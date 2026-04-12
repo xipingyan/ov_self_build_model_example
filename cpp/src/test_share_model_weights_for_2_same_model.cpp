@@ -4,6 +4,8 @@
 #include <fstream>
 #include <sstream>
 
+#include <openvino/runtime/tensor.hpp>
+
 // Test case: share model weights for 2 same model
 namespace
 {
@@ -25,27 +27,11 @@ namespace
         return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     }
 
-    ov::Tensor read_bin_to_tensor(const std::string &bin_path)
+    ov::Tensor read_bin_to_tensor(const std::string& bin_path, bool mmap = true)
     {
-        std::ifstream file(bin_path, std::ios::binary);
-        if (!file.is_open())
-        {
-            throw std::runtime_error("Failed to open file: " + bin_path);
-        }
-        file.seekg(0, std::ios::end);
-        const std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        if (size <= 0) {
-            throw std::runtime_error("Invalid .bin size for: " + bin_path);
-        }
-
-        ov::Tensor tensor(ov::element::u8, {static_cast<size_t>(size)});
-        file.read(reinterpret_cast<char*>(tensor.data()), size);
-        if (!file) {
-            throw std::runtime_error("Failed to read .bin data from: " + bin_path);
-        }
-        return tensor;
+        // Uses OpenVINO's public API to read tensor data from file.
+        // When mmap=true, the returned tensor is backed by file mapping and pages are loaded on demand.
+        return ov::read_tensor_data(bin_path, ov::element::u8, ov::PartialShape::dynamic(1), 0, mmap);
     }
 
     // Read xml to string, bin to ov::Tensor.
@@ -56,7 +42,9 @@ namespace
             bin_path.replace(bin_path.find(".xml"), 4, ".bin");
         }
         std::string xml_str = read_file(xml_path);
-        ov::Tensor bin_tensor = read_bin_to_tensor(bin_path);
+        bool enable_mmap = false; // Set to true to enable memory mapping for the .bin file, which can reduce memory usage when loading large models.
+        enable_mmap = true;
+        ov::Tensor bin_tensor = read_bin_to_tensor(bin_path, enable_mmap);
         return {xml_str, bin_tensor};
     }
 
@@ -94,17 +82,25 @@ namespace
             }
         }
     }
+
+    void infer(ov::InferRequest& infer_request)
+    {
+        auto input_ids = ov::Tensor(ov::element::i64, {1, 512});
+        for (size_t i = 0; i < 512; ++i) {
+            static_cast<int64_t*>(input_ids.data())[i] = static_cast<int64_t>(i + 1000);
+        }
+        infer_request.set_input_tensor(0, input_ids);
+
+        infer_request.infer();
+        auto output = infer_request.get_output_tensor(0);
+        // std::cout << "Output tensor shape: " << output.get_shape() << std::endl;
+        print_cur_vram("After inference: ");
+    }
 } // namespace
 
 void test_case_1(std::string xml_path)
 {
     std::cout << "---> test_case_1: share model weights for 2 same model" << std::endl;
-    std::string bin_path = xml_path;
-    const size_t xml_pos = bin_path.rfind(".xml");
-    if (xml_pos != std::string::npos) {
-        bin_path.replace(xml_pos, 4, ".bin");
-    }
-    const std::string bin_track = basename_of(bin_path);
     print_cur_vram("Before loading model: ");
 
     auto [xml_str, bin_tensor] = load_xml_bin(xml_path);
@@ -126,21 +122,18 @@ void test_case_1(std::string xml_path)
     print_cur_vram("After creating infer request1: ");
     auto infer_request2 = cm2.create_infer_request();
     print_cur_vram("After creating infer request2: ");
+
+    infer(infer_request1);
+    infer(infer_request2);
 }
 
 void test_case_2(std::string xml_path)
 {
     std::cout << "---> test_case_2: no share model weights for 2 same model" << std::endl;
-    std::string bin_path = xml_path;
-    const size_t xml_pos = bin_path.rfind(".xml");
-    if (xml_pos != std::string::npos) {
-        bin_path.replace(xml_pos, 4, ".bin");
-    }
-    const std::string bin_track = basename_of(bin_path);
     print_cur_vram("Before loading model: ");
 
     ov::Core core;
-    core.set_property(ov::enable_mmap(false));
+    // core.set_property(ov::enable_mmap(false));
     core.get_versions("CPU");
     auto model1 = core.read_model(xml_path);
     print_cur_vram("After reading model1: ");
@@ -156,6 +149,9 @@ void test_case_2(std::string xml_path)
     print_cur_vram("After creating infer request1: ");
     auto infer_request2 = cm2.create_infer_request();
     print_cur_vram("After creating infer request2: ");
+
+    infer(infer_request1);
+    infer(infer_request2);
 }
 
 bool test_share_model_weights_for_2_same_model()
