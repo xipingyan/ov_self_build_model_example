@@ -98,7 +98,7 @@ namespace
     }
 } // namespace
 
-void test_case_1(std::string xml_path)
+void test_case_1(std::string xml_path, std::string device)
 {
     std::cout << "---> test_case_1: share model weights for 2 same model" << std::endl;
     print_cur_vram("Before loading model: ");
@@ -113,9 +113,9 @@ void test_case_1(std::string xml_path)
     auto model2 = core.read_model(xml_str, bin_tensor);
     print_cur_vram("After reading model2: ");
 
-    auto cm1 = core.compile_model(model1, "CPU");
+    auto cm1 = core.compile_model(model1, device);
     print_cur_vram("After compiling model1: ");
-    auto cm2 = core.compile_model(model2, "CPU");
+    auto cm2 = core.compile_model(model2, device);
     print_cur_vram("After compiling model2: ");
 
     auto infer_request1 = cm1.create_infer_request();
@@ -127,7 +127,7 @@ void test_case_1(std::string xml_path)
     infer(infer_request2);
 }
 
-void test_case_2(std::string xml_path)
+void test_case_2(std::string xml_path, std::string device)
 {
     std::cout << "---> test_case_2: no share model weights for 2 same model" << std::endl;
     print_cur_vram("Before loading model: ");
@@ -140,9 +140,9 @@ void test_case_2(std::string xml_path)
     auto model2 = core.read_model(xml_path);
     print_cur_vram("After reading model2: ");
 
-    auto cm1 = core.compile_model(model1, "CPU");
+    auto cm1 = core.compile_model(model1, device);
     print_cur_vram("After compiling model1: ");
-    auto cm2 = core.compile_model(model2, "CPU");
+    auto cm2 = core.compile_model(model2, device);
     print_cur_vram("After compiling model2: ");
 
     auto infer_request1 = cm1.create_infer_request();
@@ -156,9 +156,15 @@ void test_case_2(std::string xml_path)
 
 bool test_share_model_weights_for_2_same_model()
 {
+    std::string device = "CPU";
+    device = "GPU";
     // bin size: 372 MB.
     std::string xml_path = "../../../modular_genai/composable_pipeline/tests/test_models/Qwen3-Omni-4B-Instruct-multilingual-int4/openvino_text_embeddings_model.xml";
-    test_case_1(xml_path);
-    test_case_2(xml_path);
+    test_case_1(xml_path, device);
+    test_case_2(xml_path, device);
+
+    // 结论：
+    // 1) 当使用 core.read_model(xml_str, bin_tensor) 直接传入 bin_tensor 时，两个模型共享权重，内存占用较小（约 400MB）。
+    // 2) 使用GPU时，mmap只能在host上共享，GPU上仍然会有两份权重副本，内存占用较大（约 800MB）。使用CPU时，mmap可以共享，内存占用较小（约 400MB）。
     return true;
 }
