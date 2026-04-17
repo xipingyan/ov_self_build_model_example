@@ -38,8 +38,8 @@ inline std::shared_ptr<ov::opset1::Constant> createConstant(const ov::element::T
 	return std::make_shared<ov::opset1::Constant>(tensor);
 }
 
-std::vector<float> randomData(const ov::Shape& shape);
-std::vector<uint8_t> randomData_U8(const ov::Shape& shape);
+std::vector<float> randomData(const ov::Shape& shape, float min = 0.2f, float max = 0.8f, uint32_t seed = 42);
+std::vector<uint8_t> randomData_U8(const ov::Shape& shape, uint8_t min = 0, uint8_t max = 255, uint32_t seed = 42);
 
 #ifndef EXPECT_EQ
 #define EXPECT_EQ(a, b)                                                                      \

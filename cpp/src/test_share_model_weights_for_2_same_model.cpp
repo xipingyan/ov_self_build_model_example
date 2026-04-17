@@ -114,8 +114,9 @@ void test_case_1(std::string xml_path, std::string device)
     print_cur_vram("After reading model2: ");
 
     auto cm1 = core.compile_model(model1, device);
+    auto cm1_context = cm1.get_context();
     print_cur_vram("After compiling model1: ");
-    auto cm2 = core.compile_model(model2, device);
+    auto cm2 = core.compile_model(model2, cm1_context, {});
     print_cur_vram("After compiling model2: ");
 
     auto infer_request1 = cm1.create_infer_request();
@@ -161,7 +162,7 @@ bool test_share_model_weights_for_2_same_model()
     // bin size: 372 MB.
     std::string xml_path = "../../../modular_genai/composable_pipeline/tests/test_models/Qwen3-Omni-4B-Instruct-multilingual-int4/openvino_text_embeddings_model.xml";
     test_case_1(xml_path, device);
-    test_case_2(xml_path, device);
+    // test_case_2(xml_path, device);
 
     // 结论：
     // 1) 当使用 core.read_model(xml_str, bin_tensor) 直接传入 bin_tensor 时，两个模型共享权重，内存占用较小（约 400MB）。

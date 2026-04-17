@@ -21,12 +21,15 @@ static std::shared_ptr<ov::Model> initModel(std::string model_name = "model_name
     auto input1 = std::make_shared<ov::opset1::Parameter>(ov::element::f32, ov::Shape{1024, 1024});
 
     auto weights_shape = ov::Shape({1024, 1024});
-    auto weights_data = randomData(weights_shape);
+    auto weights_data = randomData(weights_shape, 0.2f, 0.8f, 43);
     auto weights = std::make_shared<ov::opset1::Constant>(ov::element::f32, weights_shape, weights_data);
 
-    auto m = std::make_shared<ov::opset1::MatMul>(input1, weights, false, false);
+    auto mm_node = std::make_shared<ov::opset1::MatMul>(input1, weights, false, false);
 
-    auto result = std::make_shared<ov::opset6::Result>(m);
+    auto softmax_node = std::make_shared<ov::opset1::Softmax>(mm_node);
+    softmax_node->set_friendly_name("softmax_node");
+
+    auto result = std::make_shared<ov::opset6::Result>(softmax_node);
     auto model = std::make_shared<ov::Model>(ov::ResultVector({result}), ov::ParameterVector({input1}), model_name);
 
     return model;
