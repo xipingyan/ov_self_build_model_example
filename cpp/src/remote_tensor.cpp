@@ -18,7 +18,8 @@ static std::shared_ptr<ov::Model> initModel(std::string model_name = "model_name
 {
     std::cout << " == initModel with model name: [" << model_name << "]" << std::endl;
     // Input 1: parameter
-    auto input1 = std::make_shared<ov::opset1::Parameter>(ov::element::f32, ov::Shape{1024, 1024});
+    // New found: dynamic shape with -1 is also supported in remote tensor.
+    auto input1 = std::make_shared<ov::opset1::Parameter>(ov::element::f32, ov::PartialShape{-1, 1024});
 
     auto weights_shape = ov::Shape({1024, 1024});
     auto weights_data = randomData(weights_shape, 0.2f, 0.8f, 43);
@@ -87,7 +88,11 @@ bool test_remote_tensor()
     ov::RemoteTensor remote_output_1, remote_output_2;
     if (g_enable_remote_tensor)
     {
+        // Set output tensor to remote tensor, avoid copy from device to host after inference.
         ov::Shape output_shape = inferRequest_1.get_output_tensor().get_shape();
+        std::cout << "  == inferRequest_1 output_shape: " << output_shape << std::endl;
+        // output_shape = [0, 1024], but we can still create remote tensor with this shape, and the real shape will be decided in runtime.
+
         remote_output_1 = context.create_tensor(ov::element::f32, output_shape);
         remote_output_2 = context.create_tensor(ov::element::f32, output_shape);
         inferRequest_1.set_output_tensor(0, remote_output_1);
@@ -101,11 +106,11 @@ bool test_remote_tensor()
         std::cout << "  == Loop " << i << std::endl;
 
         PROFILE(P, "LOOP");
-        // std::cout << "  == input1 is remote tensor: " << input1.is<ov::RemoteTensor>() << std::endl;
+        std::cout << "  == input1 is remote tensor: " << input1.is<ov::RemoteTensor>() << std::endl;
         auto output1 = infer(input1, inferRequest_1);
-        // std::cout << "  == output1 is remote tensor: " << output1.is<ov::RemoteTensor>() << std::endl;
+        std::cout << "  == output1 is remote tensor: " << output1.is<ov::RemoteTensor>() << std::endl;
         auto output2 = infer(output1, inferRequest_2);
-        // std::cout << "  == output2 is remote tensor: " << output2.is<ov::RemoteTensor>() << std::endl;
+        std::cout << "  == output2 is remote tensor: " << output2.is<ov::RemoteTensor>() << std::endl;
 
         input1 = output2;
     }
