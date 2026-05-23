@@ -13,7 +13,8 @@ int main(int argc, char **argv)
     // TEST(test_model_stateful());
     // TEST(test_model_if());
     // TEST(test_model_concat());
-    TEST(test_remote_tensor());
+    // TEST(test_remote_tensor());
+    TEST(test_remote_tensor_dynamic());
     // TEST(test_ov_model_with_custom_op());
     // TEST(test_merge_2_ov_ir());
     // TEST(test_build_position_ids());
